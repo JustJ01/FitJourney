@@ -7,7 +7,7 @@ import { mockUsers, mockTrainers } from '@/lib/data'; // Assuming mock users are
 
 interface AuthContextType {
   user: User | Trainer | null;
-  login: (email: string, roleSwitch?: 'member' | 'trainer') => Promise<void>; // Added roleSwitch for testing
+  login: (email: string, roleSwitch?: 'member' | 'trainer') => Promise<void>;
   logout: () => void;
   loading: boolean;
 }
@@ -23,51 +23,80 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user session (e.g., in localStorage)
     const storedUser = localStorage.getItem('fitjourney-user');
     if (storedUser) {
-      setUser(JSON.parse(storedUser));
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        console.error("Failed to parse stored user:", e);
+        localStorage.removeItem('fitjourney-user');
+      }
     }
     setLoading(false);
   }, []);
 
   const login = async (email: string, roleSwitch?: 'member' | 'trainer') => {
     setLoading(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    let foundUser: User | Trainer | undefined = mockTrainers.find(u => u.email === email);
-    if (!foundUser) {
-      foundUser = mockUsers.find(u => u.email === email);
+    await new Promise(resolve => setTimeout(resolve, 500)); // Simulate API call
+
+    let finalUserToSet: User | Trainer | null = null;
+
+    const potentialTrainer = mockTrainers.find(u => u.email === email);
+    const potentialMember = mockUsers.find(u => u.email === email);
+
+    if (roleSwitch === 'trainer') {
+      if (potentialTrainer) {
+        // Logging in as an existing trainer
+        finalUserToSet = { ...potentialTrainer, role: 'trainer' };
+      } else if (potentialMember) {
+        // User exists as a member, "upgrade" to trainer for this session
+        const trainerData = mockTrainers.find(t => t.id === potentialMember.id) || { bio: 'Default Trainer Bio', specializations: ['Fitness'] };
+        finalUserToSet = { ...potentialMember, ...trainerData, role: 'trainer' };
+      } else {
+        // No existing user with this email, and attempting to log in as trainer
+        setLoading(false);
+        throw new Error(`Trainer account with email ${email} not found.`);
+      }
+    } else if (roleSwitch === 'member') {
+      if (potentialMember) {
+        // Logging in as an existing member
+        finalUserToSet = { ...potentialMember, role: 'member' };
+      } else if (potentialTrainer) {
+        // User exists as a trainer, but logging in as member (strip trainer fields for session)
+        const { bio, specializations, ...memberVersion } = potentialTrainer;
+        finalUserToSet = { ...memberVersion, role: 'member' };
+      } else {
+        // No existing user, create new member
+        finalUserToSet = { id: Date.now().toString(), name: email.split('@')[0], email, role: 'member' };
+      }
+    } else { 
+      // Fallback if roleSwitch is not provided (should not happen with current LoginPage)
+      // Prioritize trainer role if email matches, then member, then new member.
+      if (potentialTrainer) {
+        finalUserToSet = potentialTrainer;
+      } else if (potentialMember) {
+        finalUserToSet = potentialMember;
+      } else {
+        finalUserToSet = { id: Date.now().toString(), name: email.split('@')[0], email, role: 'member' };
+      }
     }
 
-    if (foundUser) {
-      // For testing, allow switching role if roleSwitch is provided
-      if (roleSwitch) {
-        const baseUser = { ...foundUser, role: roleSwitch };
-        if (roleSwitch === 'trainer' && !('bio' in baseUser)) {
-          // If switching to trainer and it was a base member, add trainer fields
-          const trainerVersion = mockTrainers.find(t => t.id === baseUser.id) || { bio: 'Default Trainer Bio', specializations: ['Fitness']};
-          setUser({...baseUser, ...trainerVersion, role: 'trainer'});
-        } else {
-          setUser(baseUser);
-        }
-      } else {
-         setUser(foundUser);
-      }
-      localStorage.setItem('fitjourney-user', JSON.stringify(foundUser)); // Persist user
+    if (finalUserToSet) {
+      setUser(finalUserToSet);
+      localStorage.setItem('fitjourney-user', JSON.stringify(finalUserToSet));
     } else {
-      // For demo purposes, create a new member user if not found
-      const newUser: User = { id: Date.now().toString(), name: email.split('@')[0], email, role: 'member' };
-      setUser(newUser);
-      localStorage.setItem('fitjourney-user', JSON.stringify(newUser));
+      // This case should ideally be covered by the "Trainer not found" error.
+      // If it still reaches here, it's an unexpected login failure.
+      setLoading(false);
+      throw new Error("Login failed. Please check your credentials or role selection.");
     }
+
     setLoading(false);
   };
 
   const logout = () => {
     setUser(null);
-    localStorage.removeItem('fitjourney-user'); // Clear persisted user
+    localStorage.removeItem('fitjourney-user');
   };
 
   return (
