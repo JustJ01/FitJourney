@@ -38,7 +38,7 @@ export default function CreatePlanPage() {
 
       const newPlan = await createPlan(planDataForApi, exercisesToSave);
       toast({ title: "Plan Created!", description: `${newPlan.name} has been successfully created.` });
-      router.push('/dashboard'); // Redirect to dashboard or the new plan's edit page
+      router.push(`/dashboard/plans/${newPlan.id}/edit`); // Redirect to the new plan's edit page
     } catch (error) {
       console.error("Failed to create plan:", error);
       toast({ title: "Creation Failed", description: "Could not create the plan. Please try again.", variant: "destructive" });
