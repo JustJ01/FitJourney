@@ -90,19 +90,19 @@ const PlanFiltersComponent: React.FC<PlanFiltersProps> = ({ filters, onFilterCha
             <AccordionTrigger className="text-base font-semibold">Minimum Rating</AccordionTrigger>
             <AccordionContent className="pt-2">
               <Select
-                value={filters.rating?.toString() || ''}
-                onValueChange={(value) => handleInputChange('rating', value ? parseInt(value) : null)}
+                value={filters.rating?.toString() || 'all_ratings'}
+                onValueChange={(value) => handleInputChange('rating', value === 'all_ratings' ? null : (value ? parseInt(value) : null))}
               >
                 <SelectTrigger className="text-sm">
                   <SelectValue placeholder="Any rating" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all_ratings" className="text-sm">Any Rating</SelectItem>
                   {[1, 2, 3, 4, 5].map((r) => (
                     <SelectItem key={r} value={r.toString()} className="text-sm">
                       {r} Star{r > 1 ? 's' : ''} & Up
                     </SelectItem>
                   ))}
-                  <SelectItem value="" className="text-sm">Any Rating</SelectItem>
                 </SelectContent>
               </Select>
             </AccordionContent>
