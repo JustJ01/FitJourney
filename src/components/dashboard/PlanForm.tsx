@@ -4,7 +4,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
-import type { Plan, Exercise, BMICategory } from '@/types';
+import type { Plan, Exercise, BMICategory, PlanSpecificBMICategory } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -15,7 +15,7 @@ import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import ExerciseInput from "./ExerciseInput";
 import { PlusCircle, Save, Trash2, Activity } from "lucide-react";
-import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE } from "@/lib/constants";
+import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE, ACTUAL_PLAN_BMI_CATEGORIES } from "@/lib/constants";
 import { Separator } from "../ui/separator";
 
 const exerciseSchema = z.object({
@@ -37,7 +37,7 @@ const planFormSchema = z.object({
   targetAudience: z.string().min(1, "Target audience is required."),
   ageMin: z.coerce.number().min(10).max(100),
   ageMax: z.coerce.number().min(10).max(100),
-  bmiCategories: z.array(z.string()).min(1, "At least one BMI category must be selected."),
+  bmiCategories: z.array(z.enum(ACTUAL_PLAN_BMI_CATEGORIES)).min(1, "At least one BMI category must be selected."),
   exercises: z.array(exerciseSchema).optional().default([]),
   isPublished: z.boolean().optional().default(false),
 }).refine(data => data.ageMin <= data.ageMax, {
@@ -54,6 +54,10 @@ interface PlanFormProps {
   submitButtonText?: string;
 }
 
+// Prepare BMI categories for the form (excluding 'All')
+const bmiCategoriesForForm = BMI_CATEGORIES.filter(c => c !== 'All') as PlanSpecificBMICategory[];
+
+
 const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting, submitButtonText = "Save Plan" }) => {
   const form = useForm<PlanFormData>({
     resolver: zodResolver(planFormSchema),
@@ -61,6 +65,8 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       ...initialData,
       exercises: initialData.exercises || [],
       isPublished: initialData.isPublished || false,
+      // Ensure bmiCategories from initialData (PlanSpecificBMICategory[]) aligns with Zod schema
+      bmiCategories: initialData.bmiCategories.filter(cat => ACTUAL_PLAN_BMI_CATEGORIES.includes(cat as any)) as PlanSpecificBMICategory[],
     } : {
       name: "",
       description: "",
@@ -71,7 +77,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       targetAudience: "Beginners",
       ageMin: DEFAULT_AGE_RANGE[0],
       ageMax: DEFAULT_AGE_RANGE[1],
-      bmiCategories: ['Normal'],
+      bmiCategories: ['Normal'] as PlanSpecificBMICategory[], // Default to 'Normal' which is a PlanSpecificBMICategory
       exercises: [],
       isPublished: false,
     },
@@ -183,9 +189,9 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                         <FormDescription>Select all applicable BMI ranges for this plan.</FormDescription>
                         </div>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                        {BMI_CATEGORIES.filter(c => c !== 'All').map((category) => (
+                        {bmiCategoriesForForm.map((categoryValue) => (
                             <FormField
-                            key={category}
+                            key={categoryValue}
                             control={form.control}
                             name="bmiCategories"
                             render={({ field }) => {
@@ -193,19 +199,19 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                 <FormItem className="flex flex-row items-start space-x-2 space-y-0 bg-muted/20 p-2 rounded-md">
                                     <FormControl>
                                     <Checkbox
-                                        checked={field.value?.includes(category)}
+                                        checked={field.value?.includes(categoryValue)}
                                         onCheckedChange={(checked) => {
                                         return checked
-                                            ? field.onChange([...(field.value || []), category])
+                                            ? field.onChange([...(field.value || []), categoryValue])
                                             : field.onChange(
                                                 (field.value || []).filter(
-                                                (value) => value !== category
+                                                (value) => value !== categoryValue
                                                 )
                                             );
                                         }}
                                     />
                                     </FormControl>
-                                    <FormLabel className="text-sm font-normal cursor-pointer">{category}</FormLabel>
+                                    <FormLabel className="text-sm font-normal cursor-pointer">{categoryValue}</FormLabel>
                                 </FormItem>
                                 );
                             }}
@@ -250,7 +256,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
             )}
             {fields.map((field, index) => (
               <ExerciseInput
-                key={field.id}
+                key={field.id || `new-${index}`} // Ensure key for new items
                 exercise={field}
                 index={index}
                 onExerciseChange={handleExerciseChange}

@@ -1,8 +1,12 @@
+
 import type { BMICategory } from '@/types';
 
 export const APP_NAME = "FitJourney";
 
 export const BMI_CATEGORIES: BMICategory[] = ['All', 'Underweight', 'Normal', 'Overweight', 'Obese'];
+
+// Specific BMI categories that a plan can be assigned, excluding 'All'
+export const ACTUAL_PLAN_BMI_CATEGORIES = ['Underweight', 'Normal', 'Overweight', 'Obese'] as const;
 
 export const FITNESS_GOALS = [
   "Weight Loss",

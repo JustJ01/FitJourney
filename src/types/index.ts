@@ -1,5 +1,6 @@
 
 import type { GeneratePersonalizedPlanOutput } from '@/ai/flows/generate-personalized-plan';
+import type { ACTUAL_PLAN_BMI_CATEGORIES } from '@/lib/constants';
 
 export interface User {
   id: string;
@@ -26,6 +27,7 @@ export interface Exercise {
 }
 
 export type BMICategory = 'Underweight' | 'Normal' | 'Overweight' | 'Obese' | 'All';
+export type PlanSpecificBMICategory = typeof ACTUAL_PLAN_BMI_CATEGORIES[number];
 
 export interface Plan {
   id: string;
@@ -41,7 +43,7 @@ export interface Plan {
   trainerAvatarUrl?: string;
   ageMin: number;
   ageMax: number;
-  bmiCategories: BMICategory[];
+  bmiCategories: PlanSpecificBMICategory[];
   createdAt: string; // ISO date string
   updatedAt: string; // ISO date string
   exercises?: Exercise[];
@@ -61,9 +63,9 @@ export type AIGeneratedPlan = GeneratePersonalizedPlanOutput['plan'];
 
 export interface PlanFilters {
   ageRange: [number, number];
-  bmiCategory: BMICategory | '';
+  bmiCategory: BMICategory | ''; // Can be 'All' or specific, or '' for reset state
   rating: number | null;
   price: [number, number];
-  duration: string; // e.g. "1-4 weeks", "1-3 months", "3+ months"
+  duration: string; // e.g. "1-4 weeks", "1-3 months", "3+ months", or "" for any
   searchTerm: string;
 }

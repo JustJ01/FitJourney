@@ -1,6 +1,7 @@
 
-import type { User, Trainer, Plan, Exercise, BMICategory, AIGeneratedPlan } from '@/types';
+import type { User, Trainer, Plan, Exercise, BMICategory, AIGeneratedPlan, PlanSpecificBMICategory } from '@/types';
 import { v4 as uuidv4 } from 'uuid'; // For generating unique IDs
+import { ACTUAL_PLAN_BMI_CATEGORIES } from './constants';
 
 // Mock Users
 export let mockUsers: User[] = [
@@ -66,7 +67,7 @@ export let mockPlans: Plan[] = [
     trainerAvatarUrl: 'https://placehold.co/100x100.png?text=CT',
     ageMin: 18,
     ageMax: 40,
-    bmiCategories: ['Normal', 'Overweight'],
+    bmiCategories: ['Normal', 'Overweight'] as PlanSpecificBMICategory[],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 10).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
     isPublished: true,
@@ -85,7 +86,7 @@ export let mockPlans: Plan[] = [
     trainerAvatarUrl: 'https://placehold.co/100x100.png?text=DT',
     ageMin: 16,
     ageMax: 60,
-    bmiCategories: ['Underweight', 'Normal', 'Overweight'],
+    bmiCategories: ['Underweight', 'Normal', 'Overweight'] as PlanSpecificBMICategory[],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 20).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
     isPublished: true,
@@ -104,7 +105,7 @@ export let mockPlans: Plan[] = [
     trainerAvatarUrl: 'https://placehold.co/100x100.png?text=CT',
     ageMin: 20,
     ageMax: 50,
-    bmiCategories: ['Normal', 'Overweight', 'Obese'],
+    bmiCategories: ['Normal', 'Overweight', 'Obese'] as PlanSpecificBMICategory[],
     createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 15).toISOString(),
     updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24 * 1).toISOString(),
     isPublished: false, // Unpublished plan for dashboard testing
@@ -149,7 +150,7 @@ export const getPlansByTrainerId = async (trainerId: string): Promise<Plan[]> =>
 };
 
 // Create a new plan
-export const createPlan = async (planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl'>, exercisesData: Omit<Exercise, 'id' | 'planId'>[]): Promise<Plan> => {
+export const createPlan = async (planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl' | 'exercises'> & { bmiCategories: PlanSpecificBMICategory[] }, exercisesData: Omit<Exercise, 'id' | 'planId'>[]): Promise<Plan> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   const trainer = mockTrainers.find(t => t.id === planData.trainerId);
   const newPlan: Plan = {
@@ -160,6 +161,7 @@ export const createPlan = async (planData: Omit<Plan, 'id' | 'createdAt' | 'upda
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     isPublished: planData.isPublished === undefined ? false : planData.isPublished,
+    bmiCategories: planData.bmiCategories, // Already PlanSpecificBMICategory[] from form
   };
   mockPlans.push(newPlan);
 
@@ -174,13 +176,25 @@ export const createPlan = async (planData: Omit<Plan, 'id' | 'createdAt' | 'upda
 };
 
 // Update an existing plan
-export const updatePlan = async (planId: string, planData: Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl'>>, exercisesData: Omit<Exercise, 'id' | 'planId'>[]): Promise<Plan | undefined> => {
+export const updatePlan = async (planId: string, planData: Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl' | 'exercises'>> & { bmiCategories?: PlanSpecificBMICategory[] }, exercisesData: Omit<Exercise, 'id' | 'planId'>[]): Promise<Plan | undefined> => {
   await new Promise(resolve => setTimeout(resolve, 500));
   const planIndex = mockPlans.findIndex(p => p.id === planId);
   if (planIndex === -1) return undefined;
 
-  const updatedPlan = { ...mockPlans[planIndex], ...planData, updatedAt: new Date().toISOString() };
-  mockPlans[planIndex] = updatedPlan;
+  const currentPlan = mockPlans[planIndex];
+  const updatedPlanData = { 
+    ...currentPlan, 
+    ...planData, 
+    updatedAt: new Date().toISOString() 
+  };
+  
+  // Ensure bmiCategories is correctly typed if present in planData
+  if (planData.bmiCategories) {
+    updatedPlanData.bmiCategories = planData.bmiCategories;
+  }
+
+
+  mockPlans[planIndex] = updatedPlanData;
 
   // Remove old exercises for this plan and add new ones
   mockExercises = mockExercises.filter(ex => ex.planId !== planId);
@@ -191,7 +205,7 @@ export const updatePlan = async (planId: string, planData: Partial<Omit<Plan, 'i
   }));
   mockExercises.push(...newExercises);
 
-  return { ...updatedPlan, exercises: newExercises };
+  return { ...updatedPlanData, exercises: newExercises };
 };
 
 // Delete a plan
@@ -208,19 +222,25 @@ export const saveAIPlanAsNew = async (aiPlan: AIGeneratedPlan, trainerId: string
   const trainer = mockTrainers.find(t => t.id === trainerId);
   if (!trainer) throw new Error("Trainer not found");
 
-  const planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl'> = {
+  // For AI generated plans, we can default to a broader set or a specific one like 'Normal'
+  // Trainers can refine this later. For now, let's use ['Normal'] or allow it to be an empty array if preferred.
+  // Using ACTUAL_PLAN_BMI_CATEGORIES[1] which is 'Normal'
+  const defaultBmiCategoryForAI: PlanSpecificBMICategory[] = [ACTUAL_PLAN_BMI_CATEGORIES[1]];
+
+
+  const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'trainerName' | 'trainerAvatarUrl'| 'exercises'> & { bmiCategories: PlanSpecificBMICategory[] } = {
     name: planName,
     description: planDescription,
     duration: aiPlan.duration,
     goal: aiPlan.goal,
-    rating: 0, // Default rating for new AI plan
-    price: 0, // Default price
-    targetAudience: "AI Generated",
+    rating: 0, 
+    price: 0, 
+    targetAudience: "AI Generated", 
     trainerId: trainer.id,
-    ageMin: 18, // Default values, can be adjusted by trainer later
+    ageMin: 18, 
     ageMax: 65,
-    bmiCategories: ['All'],
-    isPublished: false, // AI plans are drafts by default
+    bmiCategories: defaultBmiCategoryForAI, // AI plans default to 'Normal' or can be configured.
+    isPublished: false, 
   };
 
   const exercisesData: Omit<Exercise, 'id' | 'planId'>[] = aiPlan.exercises.map(ex => ({
@@ -228,9 +248,11 @@ export const saveAIPlanAsNew = async (aiPlan: AIGeneratedPlan, trainerId: string
     dayOfWeek: ex.day,
     sets: ex.sets,
     reps: ex.reps,
+    instructions: "", // AI plan might not always provide this, default to empty
   }));
   
-  return createPlan(planData, exercisesData);
+  // The createPlan function now expects bmiCategories to be PlanSpecificBMICategory[]
+  return createPlan(planDataForCreation, exercisesData);
 };
 
 
