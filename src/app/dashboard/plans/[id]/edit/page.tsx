@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState }sfrom 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import PlanForm, { type PlanFormData } from '@/components/dashboard/PlanForm';
 import { useAuth } from '@/hooks/useAuth';
