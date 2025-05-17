@@ -166,7 +166,7 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
 
 
 export const createPlan = async (
-  planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl'>,
+  planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl' | 'rating'>,
   exercisesData: Omit<Exercise, 'id' | 'planId'>[]
 ): Promise<Plan> => {
   let trainerNameResolved: string | undefined;
@@ -180,6 +180,7 @@ export const createPlan = async (
 
   const planDocData = {
     ...planData,
+    rating: 0, // Initialize rating to 0
     trainerName: trainerNameResolved || 'Unknown Trainer',
     trainerAvatarUrl: trainerAvatarUrlResolved || '',
     createdAt: serverTimestamp(),
@@ -206,7 +207,7 @@ export const createPlan = async (
 
 export const updatePlan = async (
   planId: string,
-  planData: Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises'>>,
+  planData: Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'rating'>>, // rating is not updated via form
   exercisesData: Omit<Exercise, 'id' | 'planId'>[]
 ): Promise<Plan | undefined> => {
   const planDocRef = doc(db, 'plans', planId);
@@ -215,7 +216,10 @@ export const updatePlan = async (
     ...planData,
     updatedAt: serverTimestamp(),
   };
-
+  
+  // trainerName and trainerAvatarUrl should not be part of planData from the form if they are derived fields
+  // If trainerId can be changed, then these might need re-fetching.
+  // For now, assuming trainerId isn't changed through this form, or these are handled if trainerId changes.
   if(planData.trainerId && (planData.trainerName === undefined || planData.trainerAvatarUrl === undefined)){
       const trainerDetails = await getTrainerById(planData.trainerId);
       planUpdateData.trainerName = trainerDetails?.name || planData.trainerName || 'Unknown Trainer';
@@ -273,12 +277,12 @@ export const saveAIPlanAsNew = async (
   planDescription: string
 ): Promise<Plan> => {
 
-  const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl'> = {
+  const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl' | 'rating'> = {
     name: planName,
     description: planDescription,
     duration: aiPlan.duration,
     goal: aiPlan.goal,
-    rating: 0,
+    // rating: 0, // Will be set by createPlan
     price: 0,
     targetAudience: "AI Generated",
     trainerId: trainerId,

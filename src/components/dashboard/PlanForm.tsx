@@ -37,7 +37,6 @@ const planFormSchema = z.object({
   description: z.string().min(10, "Description must be at least 10 characters."),
   duration: z.string().min(1, "Duration is required."),
   goal: z.string().min(1, "Goal is required."),
-  rating: z.coerce.number().min(0).max(5).optional().default(0),
   price: z.coerce.number().min(0, "Price cannot be negative.").optional().default(0),
   targetAudience: z.string().min(1, "Target audience is required."),
   ageMin: z.coerce.number().min(10).max(100),
@@ -67,11 +66,13 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     resolver: zodResolver(planFormSchema),
     defaultValues: initialData ? {
       ...initialData,
+      // rating is part of initialData (Plan type), but not in PlanFormData anymore.
+      // If needed for display in form, it would require separate handling. For now, it's simply not part of the form.
       exercises: (initialData.exercises || []).map(ex => ({
         id: ex.id, // Keep id if present for existing exercises
         name: ex.name || "",
         dayOfWeek: ex.dayOfWeek || "Monday",
-        sets: ex.sets || 0, // Ensure sets has a default, Zod will coerce and validate
+        sets: ex.sets || 0, 
         reps: ex.reps || "",
         instructions: ex.instructions || "",
       })),
@@ -82,7 +83,6 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       description: "",
       duration: PLAN_DURATIONS[2], 
       goal: FITNESS_GOALS[0],
-      rating: 0,
       price: 0,
       targetAudience: "Beginners",
       ageMin: DEFAULT_AGE_RANGE[0],
@@ -118,7 +118,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     setAiSuggestedPlanTextual(null);
     try {
       const currentPlanData = form.getValues();
-      const planForAI = {
+      const planForAI = { // This object matches the AI flow's expected input implicitly, rating is not included
         name: currentPlanData.name,
         description: currentPlanData.description,
         duration: currentPlanData.duration,
@@ -142,7 +142,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
       setAiSuggestedPlanJSON(result.modifiedPlanJSON);
-      setAiSuggestedPlanTextual(result.modifiedPlanTextual); // Changed from modificationSummary
+      setAiSuggestedPlanTextual(result.modifiedPlanTextual);
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
@@ -359,7 +359,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                             rows={10}
                                             className="mt-1 font-mono text-xs bg-muted/50"
                                         />
-                                        <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanJSON)}>
+                                        <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanJSON || "")}>
                                             Copy JSON
                                         </Button>
                                     </div>
@@ -382,7 +382,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                 )}
                 {fields.map((field, index) => (
                 <ExerciseInput
-                    key={field.id} // field.id is stable and provided by useFieldArray
+                    key={field.id} 
                     control={form.control}
                     index={index}
                     onRemoveExercise={remove} 
