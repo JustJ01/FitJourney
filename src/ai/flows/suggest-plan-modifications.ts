@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -24,9 +25,12 @@ export type SuggestPlanModificationsInput = z.infer<
 >;
 
 const SuggestPlanModificationsOutputSchema = z.object({
-  modifiedPlan: z
+  modifiedPlanJSON: z
     .string()
-    .describe('The modified fitness plan in JSON format.'),
+    .describe('The modified fitness plan in JSON format. This should be a complete JSON object representing the updated plan.'),
+  modificationSummary: z
+    .string()
+    .describe('A human-readable summary of the changes made and a brief overview of the modified plan. This should be a textual description, not JSON.'),
 });
 export type SuggestPlanModificationsOutput = z.infer<
   typeof SuggestPlanModificationsOutputSchema
@@ -51,7 +55,11 @@ Existing Plan:
 Modification Request:
 {{{modificationRequest}}}
 
-Modified Plan (in JSON format):`,
+Please provide two outputs:
+1.  The full modified plan in valid JSON format under the key 'modifiedPlanJSON'.
+2.  A human-readable summary of the key modifications and an overview of the new plan structure under the key 'modificationSummary'.
+
+Ensure the output is a single JSON object containing these two keys.`,
 });
 
 const suggestPlanModificationsFlow = ai.defineFlow(
@@ -65,3 +73,4 @@ const suggestPlanModificationsFlow = ai.defineFlow(
     return output!;
   }
 );
+

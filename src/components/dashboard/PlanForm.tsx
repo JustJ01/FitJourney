@@ -21,7 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import React, { useState } from "react";
 import { suggestPlanModifications, type SuggestPlanModificationsInput, type SuggestPlanModificationsOutput } from "@/ai/flows/suggest-plan-modifications";
 import { toast } from "@/hooks/use-toast";
-import { Label } from "@/components/ui/label"; // Added missing import
+import { Label } from "@/components/ui/label";
 
 const exerciseSchema = z.object({
   id: z.string().optional(), // For existing exercises
@@ -94,7 +94,8 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
 
   const [showSuggestDialog, setShowSuggestDialog] = useState(false);
   const [modificationRequest, setModificationRequest] = useState("");
-  const [aiSuggestedPlan, setAiSuggestedPlan] = useState<string | null>(null);
+  const [aiSuggestedPlanJSON, setAiSuggestedPlanJSON] = useState<string | null>(null);
+  const [aiSuggestedSummary, setAiSuggestedSummary] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   const handleAddExercise = () => {
@@ -112,11 +113,10 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       return;
     }
     setIsSuggesting(true);
-    setAiSuggestedPlan(null);
+    setAiSuggestedPlanJSON(null);
+    setAiSuggestedSummary(null);
     try {
       const currentPlanData = form.getValues();
-      // Construct a plan object that roughly matches what the AI might expect
-      // This could be simplified or made more robust depending on AI's exact needs
       const planForAI = {
         name: currentPlanData.name,
         description: currentPlanData.description,
@@ -140,13 +140,15 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
         modificationRequest: modificationRequest,
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
-      setAiSuggestedPlan(result.modifiedPlan);
+      setAiSuggestedPlanJSON(result.modifiedPlanJSON);
+      setAiSuggestedSummary(result.modificationSummary);
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ title: "AI Suggestion Failed", description: errorMessage, variant: "destructive" });
-      setAiSuggestedPlan("Error generating suggestions. " + errorMessage);
+      setAiSuggestedPlanJSON("Error generating JSON suggestions. " + errorMessage);
+      setAiSuggestedSummary("Error generating summary. " + errorMessage);
     } finally {
       setIsSuggesting(false);
     }
@@ -331,18 +333,33 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                 <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()}>
                                     {isSuggesting ? "Getting Suggestions..." : <><Wand2 className="mr-2 h-4 w-4" /> Get AI Suggestions</>}
                                 </Button>
-                                {aiSuggestedPlan && (
-                                    <div className="mt-4">
-                                        <Label htmlFor="aiSuggestedPlanOutput">AI Suggested Plan (JSON):</Label>
+                                {aiSuggestedSummary && (
+                                    <div className="mt-4 space-y-2">
+                                        <Label htmlFor="aiSuggestedSummaryOutput">AI Suggested Summary:</Label>
                                         <Textarea
-                                            id="aiSuggestedPlanOutput"
-                                            value={aiSuggestedPlan}
+                                            id="aiSuggestedSummaryOutput"
+                                            value={aiSuggestedSummary}
+                                            readOnly
+                                            rows={6}
+                                            className="mt-1 font-sans text-sm bg-muted/50"
+                                        />
+                                         <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedSummary)}>
+                                            Copy Summary
+                                        </Button>
+                                    </div>
+                                )}
+                                {aiSuggestedPlanJSON && (
+                                    <div className="mt-4 space-y-2">
+                                        <Label htmlFor="aiSuggestedPlanJSONOutput">AI Suggested Plan (JSON):</Label>
+                                        <Textarea
+                                            id="aiSuggestedPlanJSONOutput"
+                                            value={aiSuggestedPlanJSON}
                                             readOnly
                                             rows={10}
                                             className="mt-1 font-mono text-xs bg-muted/50"
                                         />
-                                        <Button variant="outline" size="sm" className="mt-2" onClick={() => navigator.clipboard.writeText(aiSuggestedPlan)}>
-                                            Copy to Clipboard
+                                        <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanJSON)}>
+                                            Copy JSON
                                         </Button>
                                     </div>
                                 )}
