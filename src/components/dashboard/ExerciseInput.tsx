@@ -1,101 +1,147 @@
 
 "use client";
 
-import type { Exercise } from '@/types';
+import type { Control, FieldPath, FieldValues } from 'react-hook-form';
+import { FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Trash2 } from 'lucide-react';
 import { DAYS_OF_WEEK } from '@/lib/constants';
-import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import React from 'react'; // Import React
+import React from 'react';
 
-interface ExerciseInputProps {
-  exercise: Partial<Omit<Exercise, 'id' | 'planId'>>;
+// Define a more specific type for the form data within this component's scope if needed,
+// or rely on PlanFormData from PlanForm. For now, we use generic FieldValues.
+interface ExerciseInputProps<TFieldValues extends FieldValues = FieldValues> {
+  control: Control<TFieldValues>;
   index: number;
-  onExerciseChange: (index: number, field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => void;
-  onRemoveExercise: (index: number) => void; // Keep original signature for clarity from PlanForm perspective
+  onRemoveExercise: (index: number) => void;
+  // The 'exercise' prop (actual data) is no longer directly needed here for RHF controlled fields.
+  // RHF handles data through 'control' and 'name'.
 }
 
-const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ exercise, index, onExerciseChange, onRemoveExercise }) => {
-  const handleInputChange = (field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => {
-    onExerciseChange(index, field, value);
-  };
+const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ control, index, onRemoveExercise }) => {
 
   const handleRemove = () => {
     onRemoveExercise(index);
   };
 
+  // Construct field names dynamically
+  const nameFieldName = `exercises.${index}.name` as FieldPath<FieldValues>;
+  const dayOfWeekFieldName = `exercises.${index}.dayOfWeek` as FieldPath<FieldValues>;
+  const setsFieldName = `exercises.${index}.sets` as FieldPath<FieldValues>;
+  const repsFieldName = `exercises.${index}.reps` as FieldPath<FieldValues>;
+  const instructionsFieldName = `exercises.${index}.instructions` as FieldPath<FieldValues>;
+
   return (
     <div className="p-4 border rounded-lg space-y-3 bg-muted/20 relative shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-                <Label htmlFor={`exerciseName-${index}`} className="text-xs">Exercise Name</Label>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <FormField
+          control={control}
+          name={nameFieldName}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor={`exerciseName-${index}`} className="text-xs">Exercise Name</FormLabel>
+              <FormControl>
                 <Input
-                    id={`exerciseName-${index}`}
-                    placeholder="e.g., Squats"
-                    value={exercise.name || ''}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="text-sm h-9"
+                  id={`exerciseName-${index}`}
+                  placeholder="e.g., Squats"
+                  {...field}
+                  className="text-sm h-9"
                 />
-            </div>
-            <div>
-                <Label htmlFor={`dayOfWeek-${index}`} className="text-xs">Day of Week</Label>
-                <Select
-                    value={exercise.dayOfWeek || ''}
-                    onValueChange={(value) => handleInputChange('dayOfWeek', value)}
-                >
-                    <SelectTrigger id={`dayOfWeek-${index}`} className="text-sm h-9">
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={control}
+          name={dayOfWeekFieldName}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor={`dayOfWeek-${index}`} className="text-xs">Day of Week</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl>
+                  <SelectTrigger id={`dayOfWeek-${index}`} className="text-sm h-9">
                     <SelectValue placeholder="Select day" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {DAYS_OF_WEEK.map(day => (
-                        <SelectItem key={day} value={day} className="text-sm">{day}</SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
-            <div>
-                <Label htmlFor={`sets-${index}`} className="text-xs">Sets</Label>
-                <Input
-                    id={`sets-${index}`}
-                    type="number"
-                    placeholder="e.g., 3"
-                    value={exercise.sets || ''}
-                    onChange={(e) => handleInputChange('sets', parseInt(e.target.value) || 0)}
-                    className="text-sm h-9"
-                />
-            </div>
-            <div>
-                <Label htmlFor={`reps-${index}`} className="text-xs">Reps</Label>
-                <Input
-                    id={`reps-${index}`}
-                    placeholder="e.g., 8-12 or To Failure"
-                    value={exercise.reps || ''}
-                    onChange={(e) => handleInputChange('reps', e.target.value)}
-                    className="text-sm h-9"
-                />
-            </div>
-        </div>
-      <div>
-        <Label htmlFor={`instructions-${index}`} className="text-xs">Instructions (Optional)</Label>
-        <Textarea
-            id={`instructions-${index}`}
-            placeholder="e.g., Keep back straight."
-            value={exercise.instructions || ''}
-            onChange={(e) => handleInputChange('instructions', e.target.value)}
-            className="text-sm min-h-[60px]"
-            rows={2}
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  {DAYS_OF_WEEK.map(day => (
+                    <SelectItem key={day} value={day} className="text-sm">{day}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )}
         />
       </div>
+      <div className="grid grid-cols-2 sm:grid-cols-2 gap-3">
+        <FormField
+          control={control}
+          name={setsFieldName}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor={`sets-${index}`} className="text-xs">Sets</FormLabel>
+              <FormControl>
+                <Input
+                  id={`sets-${index}`}
+                  type="number"
+                  placeholder="e.g., 3"
+                  {...field}
+                  onChange={e => field.onChange(parseInt(e.target.value) || 0)} // Ensure value is number
+                  className="text-sm h-9"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+        <FormField
+          control={control}
+          name={repsFieldName}
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel htmlFor={`reps-${index}`} className="text-xs">Reps</FormLabel>
+              <FormControl>
+                <Input
+                  id={`reps-${index}`}
+                  placeholder="e.g., 8-12 or To Failure"
+                  {...field}
+                  className="text-sm h-9"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+      </div>
+      <FormField
+        control={control}
+        name={instructionsFieldName}
+        render={({ field }) => (
+          <FormItem>
+            <FormLabel htmlFor={`instructions-${index}`} className="text-xs">Instructions (Optional)</FormLabel>
+            <FormControl>
+              <Textarea
+                id={`instructions-${index}`}
+                placeholder="e.g., Keep back straight."
+                {...field}
+                className="text-sm min-h-[60px]"
+                rows={2}
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
       <Button
         type="button"
         variant="ghost"
         size="icon"
-        onClick={handleRemove} // Use the memoized handler
+        onClick={handleRemove}
         className="absolute top-2 right-2 text-destructive hover:bg-destructive/10 h-7 w-7"
         aria-label="Remove exercise"
       >
@@ -105,6 +151,6 @@ const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ exercise, inde
   );
 });
 
-ExerciseInput.displayName = 'ExerciseInput'; // Good practice for React.memo components
+ExerciseInput.displayName = 'ExerciseInput';
 
 export default ExerciseInput;

@@ -18,18 +18,18 @@ import { PlusCircle, Save, Trash2, Activity, Sparkles, Wand2 } from "lucide-reac
 import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE, ACTUAL_PLAN_BMI_CATEGORIES } from "@/lib/constants";
 import { Separator } from "../ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import React, { useState, useCallback } from "react"; // Import useCallback
+import React, { useState, useCallback } from "react"; 
 import { suggestPlanModifications, type SuggestPlanModificationsInput, type SuggestPlanModificationsOutput } from "@/ai/flows/suggest-plan-modifications";
 import { toast } from "@/hooks/use-toast";
-import { Label } from "@/components/ui/label";
+import { Label } from "@/components/ui/label"; // Ensure Label is imported if used outside FormField
 
 const exerciseSchema = z.object({
-  id: z.string().optional(), // For existing exercises
+  id: z.string().optional(), // For existing exercises from initialData
   name: z.string().min(1, "Exercise name is required."),
   dayOfWeek: z.string().min(1, "Day of week is required."),
   sets: z.coerce.number().min(1, "Sets must be at least 1."),
   reps: z.string().min(1, "Reps description is required."),
-  instructions: z.string().optional(),
+  instructions: z.string().optional().default(""), // Provide default for optional string
 });
 
 const planFormSchema = z.object({
@@ -53,13 +53,12 @@ const planFormSchema = z.object({
 export type PlanFormData = z.infer<typeof planFormSchema>;
 
 interface PlanFormProps {
-  initialData?: Plan; // For editing
+  initialData?: Plan; 
   onSubmit: (data: PlanFormData) => Promise<void>;
   isSubmitting: boolean;
   submitButtonText?: string;
 }
 
-// Prepare BMI categories for the form (excluding 'All')
 const bmiCategoriesForForm = BMI_CATEGORIES.filter(c => c !== 'All') as PlanSpecificBMICategory[];
 
 
@@ -68,13 +67,20 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     resolver: zodResolver(planFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      exercises: initialData.exercises || [],
+      exercises: (initialData.exercises || []).map(ex => ({
+        id: ex.id, // Keep id if present for existing exercises
+        name: ex.name || "",
+        dayOfWeek: ex.dayOfWeek || "Monday",
+        sets: ex.sets || 0, // Ensure sets has a default, Zod will coerce and validate
+        reps: ex.reps || "",
+        instructions: ex.instructions || "",
+      })),
       isPublished: initialData.isPublished || false,
       bmiCategories: initialData.bmiCategories.filter(cat => ACTUAL_PLAN_BMI_CATEGORIES.includes(cat as any)) as PlanSpecificBMICategory[],
     } : {
       name: "",
       description: "",
-      duration: PLAN_DURATIONS[2], // Default to 4 Weeks
+      duration: PLAN_DURATIONS[2], 
       goal: FITNESS_GOALS[0],
       rating: 0,
       price: 0,
@@ -87,7 +93,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "exercises",
   });
@@ -101,21 +107,6 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
   const handleAddExercise = () => {
     append({ name: "", dayOfWeek: "Monday", sets: 3, reps: "10-12", instructions: "" });
   };
-
-  const handleExerciseChange = useCallback((index: number, field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => {
-    // It's generally safer to get the latest exercises array directly from form state
-    // if other asynchronous updates to the form could happen.
-    const currentExercises = form.getValues("exercises");
-    const specificExercise = currentExercises[index];
-    if (specificExercise) {
-        // Create a new object for the exercise to ensure react-hook-form detects the change
-        const updatedExercise = { ...specificExercise, [field]: value };
-        update(index, updatedExercise);
-    }
-  }, [form, update]); // `form` and `update` should be stable
-
-  // The `remove` function from useFieldArray is already stable.
-  // The ExerciseInput component will call remove(index).
 
   const handleRequestAISuggestions = async () => {
     if (!modificationRequest.trim()) {
@@ -151,7 +142,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
       setAiSuggestedPlanJSON(result.modifiedPlanJSON);
-      setAiSuggestedPlanTextual(result.modifiedPlanTextual);
+      setAiSuggestedPlanTextual(result.modifiedPlanTextual); // Changed from modificationSummary
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
@@ -226,7 +217,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
               <FormField control={form.control} name="price" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Price ($)</FormLabel>
-                  <FormControl><Input type="number" step="0.01" placeholder="0 for free" {...field} /></FormControl>
+                  <FormControl><Input type="number" step="0.01" placeholder="0 for free" {...field} onChange={e => field.onChange(parseFloat(e.target.value) || 0)} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )} />
@@ -238,14 +229,14 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                     <FormField control={form.control} name="ageMin" render={({ field }) => (
                         <FormItem>
                         <FormLabel>Min Age</FormLabel>
-                        <FormControl><Input type="number" placeholder="e.g., 18" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="e.g., 18" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)}/></FormControl>
                         <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={form.control} name="ageMax" render={({ field }) => (
                         <FormItem>
                         <FormLabel>Max Age</FormLabel>
-                        <FormControl><Input type="number" placeholder="e.g., 65" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="e.g., 65" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)}/></FormControl>
                         <FormMessage />
                         </FormItem>
                     )} />
@@ -392,10 +383,9 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                 {fields.map((field, index) => (
                 <ExerciseInput
                     key={field.id} // field.id is stable and provided by useFieldArray
-                    exercise={field}
+                    control={form.control}
                     index={index}
-                    onExerciseChange={handleExerciseChange} // Memoized callback
-                    onRemoveExercise={remove} // Pass stable `remove` function directly
+                    onRemoveExercise={remove} 
                 />
                 ))}
                 <Button type="button" variant="outline" onClick={handleAddExercise} className="w-full sm:w-auto">
