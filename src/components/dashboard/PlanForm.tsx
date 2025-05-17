@@ -14,9 +14,13 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import ExerciseInput from "./ExerciseInput";
-import { PlusCircle, Save, Trash2, Activity } from "lucide-react";
+import { PlusCircle, Save, Trash2, Activity, Sparkles, Wand2 } from "lucide-react";
 import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE, ACTUAL_PLAN_BMI_CATEGORIES } from "@/lib/constants";
 import { Separator } from "../ui/separator";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
+import React, { useState } from "react";
+import { suggestPlanModifications, type SuggestPlanModificationsInput, type SuggestPlanModificationsOutput } from "@/ai/flows/suggest-plan-modifications";
+import { toast } from "@/hooks/use-toast";
 
 const exerciseSchema = z.object({
   id: z.string().optional(), // For existing exercises
@@ -65,7 +69,6 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       ...initialData,
       exercises: initialData.exercises || [],
       isPublished: initialData.isPublished || false,
-      // Ensure bmiCategories from initialData (PlanSpecificBMICategory[]) aligns with Zod schema
       bmiCategories: initialData.bmiCategories.filter(cat => ACTUAL_PLAN_BMI_CATEGORIES.includes(cat as any)) as PlanSpecificBMICategory[],
     } : {
       name: "",
@@ -77,7 +80,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       targetAudience: "Beginners",
       ageMin: DEFAULT_AGE_RANGE[0],
       ageMax: DEFAULT_AGE_RANGE[1],
-      bmiCategories: ['Normal'] as PlanSpecificBMICategory[], // Default to 'Normal' which is a PlanSpecificBMICategory
+      bmiCategories: ['Normal'] as PlanSpecificBMICategory[],
       exercises: [],
       isPublished: false,
     },
@@ -88,6 +91,11 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     name: "exercises",
   });
 
+  const [showSuggestDialog, setShowSuggestDialog] = useState(false);
+  const [modificationRequest, setModificationRequest] = useState("");
+  const [aiSuggestedPlan, setAiSuggestedPlan] = useState<string | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
+
   const handleAddExercise = () => {
     append({ name: "", dayOfWeek: "Monday", sets: 3, reps: "10-12", instructions: "" });
   };
@@ -96,6 +104,53 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     const currentExercise = fields[index];
     update(index, { ...currentExercise, [field]: value });
   };
+
+  const handleRequestAISuggestions = async () => {
+    if (!modificationRequest.trim()) {
+      toast({ title: "Error", description: "Please enter your modification request.", variant: "destructive" });
+      return;
+    }
+    setIsSuggesting(true);
+    setAiSuggestedPlan(null);
+    try {
+      const currentPlanData = form.getValues();
+      // Construct a plan object that roughly matches what the AI might expect
+      // This could be simplified or made more robust depending on AI's exact needs
+      const planForAI = {
+        name: currentPlanData.name,
+        description: currentPlanData.description,
+        duration: currentPlanData.duration,
+        goal: currentPlanData.goal,
+        targetAudience: currentPlanData.targetAudience,
+        ageMin: currentPlanData.ageMin,
+        ageMax: currentPlanData.ageMax,
+        bmiCategories: currentPlanData.bmiCategories,
+        exercises: currentPlanData.exercises.map(ex => ({
+          name: ex.name,
+          dayOfWeek: ex.dayOfWeek,
+          sets: ex.sets,
+          reps: ex.reps,
+          instructions: ex.instructions
+        })),
+      };
+      
+      const input: SuggestPlanModificationsInput = {
+        existingPlan: JSON.stringify(planForAI, null, 2),
+        modificationRequest: modificationRequest,
+      };
+      const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
+      setAiSuggestedPlan(result.modifiedPlan);
+      toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
+    } catch (error) {
+      console.error("AI Suggestion Error:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      toast({ title: "AI Suggestion Failed", description: errorMessage, variant: "destructive" });
+      setAiSuggestedPlan("Error generating suggestions. " + errorMessage);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
 
   return (
     <Form {...form}>
@@ -240,43 +295,98 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
         </Card>
 
         <Card className="shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-xl flex items-center gap-2">
-                <Activity className="h-5 w-5 text-primary"/>
-                Exercises
-            </CardTitle>
-            <CardDescription>Add or modify exercises for this plan.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {fields.length === 0 && (
-                <div className="text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
-                    <p>No exercises added yet.</p>
-                    <p className="text-sm">Click "Add Exercise" to get started.</p>
+            <CardHeader>
+                <div className="flex justify-between items-center">
+                    <CardTitle className="text-xl flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-primary"/>
+                        Exercises
+                    </CardTitle>
+                    <Dialog open={showSuggestDialog} onOpenChange={setShowSuggestDialog}>
+                        <DialogTrigger asChild>
+                            <Button type="button" variant="outline" size="sm">
+                                <Sparkles className="mr-2 h-4 w-4"/> AI Suggestions
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="sm:max-w-[600px]">
+                            <DialogHeader>
+                                <DialogTitle>AI Plan Modification Suggestions</DialogTitle>
+                                <DialogDescription>
+                                    Describe how you'd like to modify the current plan, and the AI will provide suggestions.
+                                    The current plan details (name, description, exercises, etc.) will be sent to the AI.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div>
+                                    <Label htmlFor="modificationRequest">Your Modification Request:</Label>
+                                    <Textarea
+                                        id="modificationRequest"
+                                        value={modificationRequest}
+                                        onChange={(e) => setModificationRequest(e.target.value)}
+                                        placeholder="e.g., Make this plan more suitable for advanced users by adding heavier compound lifts, or shorten the duration to 2 weeks focusing on HIIT."
+                                        rows={4}
+                                        className="mt-1"
+                                    />
+                                </div>
+                                <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()}>
+                                    {isSuggesting ? "Getting Suggestions..." : <><Wand2 className="mr-2 h-4 w-4" /> Get AI Suggestions</>}
+                                </Button>
+                                {aiSuggestedPlan && (
+                                    <div className="mt-4">
+                                        <Label htmlFor="aiSuggestedPlanOutput">AI Suggested Plan (JSON):</Label>
+                                        <Textarea
+                                            id="aiSuggestedPlanOutput"
+                                            value={aiSuggestedPlan}
+                                            readOnly
+                                            rows={10}
+                                            className="mt-1 font-mono text-xs bg-muted/50"
+                                        />
+                                        <Button variant="outline" size="sm" className="mt-2" onClick={() => navigator.clipboard.writeText(aiSuggestedPlan)}>
+                                            Copy to Clipboard
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setShowSuggestDialog(false)}>Close</Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
                 </div>
-            )}
-            {fields.map((field, index) => (
-              <ExerciseInput
-                key={field.id || `new-${index}`} // Ensure key for new items
-                exercise={field}
-                index={index}
-                onExerciseChange={handleExerciseChange}
-                onRemoveExercise={() => remove(index)}
-              />
-            ))}
-            <Button type="button" variant="outline" onClick={handleAddExercise} className="w-full sm:w-auto">
-              <PlusCircle className="mr-2 h-4 w-4" /> Add Exercise
-            </Button>
-          </CardContent>
-          <CardFooter className="border-t pt-6">
+                <CardDescription>Add or modify exercises for this plan.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {fields.length === 0 && (
+                    <div className="text-center py-4 text-muted-foreground border-2 border-dashed rounded-lg">
+                        <p>No exercises added yet.</p>
+                        <p className="text-sm">Click "Add Exercise" to get started.</p>
+                    </div>
+                )}
+                {fields.map((field, index) => (
+                <ExerciseInput
+                    key={field.id || `new-${index}`} 
+                    exercise={field}
+                    index={index}
+                    onExerciseChange={handleExerciseChange}
+                    onRemoveExercise={() => remove(index)}
+                />
+                ))}
+                <Button type="button" variant="outline" onClick={handleAddExercise} className="w-full sm:w-auto">
+                <PlusCircle className="mr-2 h-4 w-4" /> Add Exercise
+                </Button>
+            </CardContent>
+         </Card>
+
+        <div className="flex justify-end pt-6 border-t">
             <Button type="submit" disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
-              <Save className="mr-2 h-5 w-5" />
-              {isSubmitting ? "Saving..." : submitButtonText}
+                <Save className="mr-2 h-5 w-5" />
+                {isSubmitting ? "Saving..." : submitButtonText}
             </Button>
-          </CardFooter>
-        </Card>
+        </div>
       </form>
     </Form>
   );
 };
 
 export default PlanForm;
+
+    
