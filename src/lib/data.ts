@@ -1,38 +1,11 @@
 
-import type { User, Trainer, Plan, Exercise, BMICategory, AIGeneratedPlan, PlanSpecificBMICategory } from '@/types';
-import { v4 as uuidv4 } from 'uuid';
+import type { User, Trainer, Plan, Exercise, PlanSpecificBMICategory, AIGeneratedPlan } from '@/types';
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc, Timestamp, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { ACTUAL_PLAN_BMI_CATEGORIES } from './constants';
 
-// Mock Users & Trainers - Kept for AuthContext until it's refactored for Firebase Auth
-export let mockUsers: User[] = [
-  { id: 'user1', name: 'Alice Member', email: 'alice@example.com', role: 'member' },
-  { id: 'user2', name: 'Bob Member', email: 'bob@example.com', role: 'member' },
-];
 
-export let mockTrainers: Trainer[] = [
-  {
-    id: 'trainer1',
-    name: 'Charlie Trainer',
-    email: 'charlie@example.com',
-    role: 'trainer',
-    bio: 'Certified fitness coach with 10 years of experience specializing in strength training and nutrition.',
-    specializations: ['Strength Training', 'Nutrition'],
-    avatarUrl: 'https://placehold.co/100x100.png?text=CT'
-  },
-  {
-    id: 'trainer2',
-    name: 'Diana Trainer',
-    email: 'diana@example.com',
-    role: 'trainer',
-    bio: 'Yoga instructor and wellness expert focused on holistic fitness and mind-body connection.',
-    specializations: ['Yoga', 'Wellness', 'Pilates'],
-    avatarUrl: 'https://placehold.co/100x100.png?text=DT'
-  },
-];
-// --- End Mock Users & Trainers ---
-
+// --- Mock Users & Trainers REMOVED as we are moving to Firebase Auth & Firestore ---
 
 // --- Data Access Functions ---
 
@@ -69,8 +42,8 @@ export const getPublishedPlans = async (): Promise<Plan[]> => {
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName, // Ensure these are populated
-      trainerAvatarUrl, // Ensure these are populated
+      trainerName: trainerName || 'Unknown Trainer', 
+      trainerAvatarUrl: trainerAvatarUrl || '', 
     } as Plan);
   }
   return plans;
@@ -107,8 +80,8 @@ export const getPlanById = async (id: string): Promise<Plan | undefined> => {
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName, // Ensure these are populated
-      trainerAvatarUrl, // Ensure these are populated
+      trainerName: trainerName || 'Unknown Trainer', 
+      trainerAvatarUrl: trainerAvatarUrl || '', 
     } as Plan;
   }
   return undefined;
@@ -147,32 +120,43 @@ export const getPlansByTrainerId = async (trainerId: string): Promise<Plan[]> =>
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName, // Ensure these are populated
-      trainerAvatarUrl, // Ensure these are populated
+      trainerName: trainerName || 'Unknown Trainer', 
+      trainerAvatarUrl: trainerAvatarUrl || '', 
     } as Plan);
   }
   return plans;
 };
 
-// Get trainer by ID
+// Get trainer by ID (Firebase UID)
 export const getTrainerById = async (id: string): Promise<Trainer | undefined> => {
   if (!id) return undefined;
-  const trainerDocRef = doc(db, 'trainers', id); // Assuming 'trainers' collection
+  const trainerDocRef = doc(db, 'trainers', id);
   const trainerDocSnap = await getDoc(trainerDocRef);
 
   if (trainerDocSnap.exists()) {
     return {
-      id: trainerDocSnap.id,
+      id: trainerDocSnap.id, // This is the Firebase UID
       ...trainerDocSnap.data()
     } as Trainer;
   }
-  // Fallback to mockTrainers if not found in DB - for AuthContext which still uses mocks
-  const mockTrainer = mockTrainers.find(t => t.id === id);
-  if (mockTrainer) {
-    console.warn(`Trainer ID ${id} fetched from mock data as fallback for AuthContext. Ensure 'trainers' collection in Firestore is populated.`);
-    return mockTrainer;
-  }
+  console.warn(`Trainer profile with ID ${id} not found in Firestore.`);
   return undefined;
+};
+
+// Get user (member) by ID (Firebase UID)
+export const getUserById = async (id: string): Promise<User | undefined> => {
+    if (!id) return undefined;
+    const userDocRef = doc(db, 'users', id); // Assuming 'users' collection for members
+    const userDocSnap = await getDoc(userDocRef);
+
+    if (userDocSnap.exists()) {
+        return {
+            id: userDocSnap.id, // This is the Firebase UID
+            ...userDocSnap.data()
+        } as User;
+    }
+    console.warn(`User profile with ID ${id} not found in Firestore 'users' collection.`);
+    return undefined;
 };
 
 
@@ -180,12 +164,20 @@ export const createPlan = async (
   planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises'>,
   exercisesData: Omit<Exercise, 'id' | 'planId'>[]
 ): Promise<Plan> => {
-  const trainerDetails = await getTrainerById(planData.trainerId);
+  let trainerName = planData.trainerName;
+  let trainerAvatarUrl = planData.trainerAvatarUrl;
+
+  if (planData.trainerId && (!trainerName || !trainerAvatarUrl)) {
+    const trainerDetails = await getTrainerById(planData.trainerId);
+    trainerName = trainerDetails?.name;
+    trainerAvatarUrl = trainerDetails?.avatarUrl;
+  }
+
 
   const planDocData = {
     ...planData,
-    trainerName: trainerDetails?.name || 'Unknown Trainer',
-    trainerAvatarUrl: trainerDetails?.avatarUrl || '',
+    trainerName: trainerName || 'Unknown Trainer',
+    trainerAvatarUrl: trainerAvatarUrl || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isPublished: planData.isPublished === undefined ? false : planData.isPublished,
@@ -201,7 +193,6 @@ export const createPlan = async (
   });
   await batch.commit();
 
-  // Fetch the newly created plan to return it with IDs and timestamps
   const newPlan = await getPlanById(planId);
   if (!newPlan) {
     throw new Error("Failed to retrieve newly created plan.");
@@ -216,10 +207,11 @@ export const updatePlan = async (
 ): Promise<Plan | undefined> => {
   const planDocRef = doc(db, 'plans', planId);
 
-  const planUpdateData = {
+  const planUpdateData: any = { // Use any for flexibility, will be type-checked by Firestore
     ...planData,
     updatedAt: serverTimestamp(),
   };
+  
   if(planData.trainerId && (planData.trainerName === undefined || planData.trainerAvatarUrl === undefined)){
       const trainerDetails = await getTrainerById(planData.trainerId);
       planUpdateData.trainerName = trainerDetails?.name || planData.trainerName || 'Unknown Trainer';
@@ -227,29 +219,24 @@ export const updatePlan = async (
   }
 
 
-  // Update the main plan document
   await updateDoc(planDocRef, planUpdateData);
 
-  // Manage exercises: delete existing ones and add new ones
   const exercisesCollectionRef = collection(db, 'plans', planId, 'exercises');
   const existingExercisesSnapshot = await getDocs(exercisesCollectionRef);
 
   const batch = writeBatch(db);
 
-  // Delete existing exercises
   existingExercisesSnapshot.docs.forEach(exDoc => {
     batch.delete(doc(db, 'plans', planId, 'exercises', exDoc.id));
   });
 
-  // Add new exercises
   exercisesData.forEach(ex => {
-    const newExerciseDocRef = doc(collection(db, 'plans', planId, 'exercises')); // Generate new ID
+    const newExerciseDocRef = doc(collection(db, 'plans', planId, 'exercises'));
     batch.set(newExerciseDocRef, ex);
   });
 
   await batch.commit();
 
-  // Fetch the updated plan to return it
   return getPlanById(planId);
 };
 
@@ -260,13 +247,11 @@ export const deletePlan = async (planId: string): Promise<boolean> => {
   try {
     const batch = writeBatch(db);
 
-    // Delete all exercises in the subcollection
     const exercisesSnapshot = await getDocs(exercisesCollectionRef);
     exercisesSnapshot.forEach(exDoc => {
       batch.delete(doc(db, 'plans', planId, 'exercises', exDoc.id));
     });
 
-    // Delete the main plan document
     batch.delete(planDocRef);
 
     await batch.commit();
@@ -283,28 +268,32 @@ export const saveAIPlanAsNew = async (
   planName: string,
   planDescription: string
 ): Promise<Plan> => {
-  const trainerDetails = await getTrainerById(trainerId);
-  if (!trainerDetails) {
-    console.error(`Trainer with ID ${trainerId} not found for AI plan save.`);
-    // Fallback or throw error - for now, let createPlan handle trainer lookup
+  
+  let trainerDetailsName: string | undefined;
+  let trainerDetailsAvatarUrl: string | undefined;
+
+  if (trainerId) {
+    const trainerDetails = await getTrainerById(trainerId);
+    trainerDetailsName = trainerDetails?.name;
+    trainerDetailsAvatarUrl = trainerDetails?.avatarUrl;
   }
 
-  // Construct plan data suitable for createPlan
+
   const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises'> = {
     name: planName,
     description: planDescription,
     duration: aiPlan.duration,
     goal: aiPlan.goal,
-    rating: 0, // Default rating for new AI plans
-    price: 0,  // Default price for new AI plans
-    targetAudience: "AI Generated", // Or be more specific based on AI input if possible
+    rating: 0, 
+    price: 0,  
+    targetAudience: "AI Generated", 
     trainerId: trainerId,
-    trainerName: trainerDetails?.name, // Will be re-fetched by createPlan if undefined
-    trainerAvatarUrl: trainerDetails?.avatarUrl, // Will be re-fetched by createPlan if undefined
-    ageMin: 18, // Default, consider making this configurable or part of AI output
-    ageMax: 65, // Default
-    bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1]], // Default to 'Normal'
-    isPublished: false, // AI plans are drafts by default
+    trainerName: trainerDetailsName, 
+    trainerAvatarUrl: trainerDetailsAvatarUrl, 
+    ageMin: 18, 
+    ageMax: 65, 
+    bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1]], 
+    isPublished: false, 
   };
 
   const exercisesData: Omit<Exercise, 'id' | 'planId'>[] = aiPlan.exercises.map(ex => ({
@@ -312,9 +301,8 @@ export const saveAIPlanAsNew = async (
     dayOfWeek: ex.day,
     sets: ex.sets,
     reps: ex.reps,
-    instructions: "", // AI plans might not have detailed instructions initially
+    instructions: "", 
   }));
 
   return createPlan(planDataForCreation, exercisesData);
 };
-

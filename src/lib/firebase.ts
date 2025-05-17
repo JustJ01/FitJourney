@@ -1,3 +1,4 @@
+
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth'; 
@@ -21,6 +22,6 @@ if (getApps().length === 0) {
 }
 
 db = getFirestore(app);
-const auth = getAuth(app);
+const auth = getAuth(app); // auth was already initialized
 
-export { app, db, auth};
+export { app, db, auth }; // Export auth
