@@ -1,26 +1,27 @@
 
 "use client";
 
-import type { User, Trainer } from '@/types';
+import type { User, Trainer, UserProfileUpdateData, TrainerProfileUpdateData } from '@/types';
 import React, { createContext, useState, useEffect, type ReactNode } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail, // Import sendPasswordResetEmail
+  sendPasswordResetEmail,
   signOut as firebaseSignOut, 
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { getUserById, getTrainerById } from '@/lib/data';
+import { doc, setDoc } from 'firebase/firestore';
+import { getUserById, getTrainerById, updateUserInFirestore, updateTrainerInFirestore } from '@/lib/data';
 
 interface AuthContextType {
   user: User | Trainer | null;
   login: (email: string, password: string, roleAttempt: 'member' | 'trainer') => Promise<void>;
   register: (name: string, email: string, password: string, role: 'member' | 'trainer') => Promise<void>;
   logout: () => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>; // Add sendPasswordReset
+  sendPasswordReset: (email: string) => Promise<void>;
+  updateUserProfile: (data: UserProfileUpdateData | TrainerProfileUpdateData) => Promise<void>;
   loading: boolean;
 }
 
@@ -45,7 +46,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           try {
             const storedUser = JSON.parse(storedUserString);
             if (storedUser && storedUser.id === firebaseUser.uid) {
-              appUser = storedUser;
+              appUser = storedUser; // Use cached user initially
             }
           } catch (e) {
             console.error("Failed to parse stored user:", e);
@@ -53,25 +54,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
         
-        if (!appUser) {
-            let fetchedProfile = await getTrainerById(firebaseUser.uid);
-            if (fetchedProfile && fetchedProfile.role === 'trainer') {
-                appUser = {
-                    ...fetchedProfile,
+        // Always try to fetch fresh data, especially role which might be stored in LS
+        // The role is crucial for determining which Firestore collection to query
+        let roleToFetch: 'member' | 'trainer' = 'member'; // Default
+        if (appUser) {
+            roleToFetch = appUser.role;
+        } else {
+            // If no cached user, we can't reliably know the role without asking again or storing it differently.
+            // For now, we'll attempt to guess based on typical scenarios or rely on a default.
+            // This part might need refinement based on UX (e.g. store attempted role during login process temporarily)
+            // As a fallback, try trainer first if it's a common path for returning users.
+            // A more robust solution might involve storing the intended role after first login/registration.
+            const trainerProfile = await getTrainerById(firebaseUser.uid);
+            if (trainerProfile) roleToFetch = 'trainer';
+        }
+
+
+        if (roleToFetch === 'trainer') {
+            const trainerProfile = await getTrainerById(firebaseUser.uid);
+            if (trainerProfile) {
+                 appUser = {
+                    ...trainerProfile, // This now comes from Firestore directly
                     id: firebaseUser.uid,
-                    email: firebaseUser.email || fetchedProfile.email,
-                    role: 'trainer',
+                    email: firebaseUser.email || trainerProfile.email, // Prefer Firebase Auth email
                 };
-            } else {
-                const memberProfile = await getUserById(firebaseUser.uid);
-                if (memberProfile) {
-                    appUser = {
-                        ...memberProfile,
-                        id: firebaseUser.uid,
-                        email: firebaseUser.email || memberProfile.email,
-                        role: 'member',
-                    };
-                }
+            }
+        } else {
+            const memberProfile = await getUserById(firebaseUser.uid);
+             if (memberProfile) {
+                appUser = {
+                    ...memberProfile, // From Firestore
+                    id: firebaseUser.uid,
+                    email: firebaseUser.email || memberProfile.email,
+                };
             }
         }
 
@@ -79,8 +94,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(appUser);
           localStorage.setItem('fitjourney-user', JSON.stringify(appUser));
         } else {
-          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore.`);
-           setUser({ id: firebaseUser.uid, email: firebaseUser.email || "", name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User", role: 'member' }); 
+          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore for role ${roleToFetch}. Logging out.`);
+          await firebaseSignOut(auth); // Log out if no profile
+          setUser(null);
+          localStorage.removeItem('fitjourney-user');
         }
 
       } else {
@@ -135,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     } catch (error: any) {
       setLoading(false);
       console.error("Firebase Login Error:", error);
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-email') {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential' || error.code === 'auth/invalid-email' || error.code === 'auth/popup-closed-by-user') {
         throw new Error("Invalid email or password.");
       } else if (error.message.includes("profile not found") || error.message.includes("role mismatch")) {
           throw error; 
@@ -152,7 +169,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
       const userProfileData = {
         name,
-        email: firebaseUser.email,
+        email: firebaseUser.email, // Store email in profile as well
         role,
       };
 
@@ -194,11 +211,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error.code === 'auth/invalid-email') {
         throw new Error("The email address is not valid.");
       } else if (error.code === 'auth/user-not-found') {
-        // Don't reveal if user exists, for security. Firebase handles this, but good to be aware.
-        // The toast message in the component is generic for this reason.
          throw new Error("If your email is registered, you will receive a reset link.");
       }
       throw new Error(error.message || "Could not send password reset email.");
+    }
+  };
+
+  const updateUserProfile = async (data: UserProfileUpdateData | TrainerProfileUpdateData) => {
+    if (!user) throw new Error("User not logged in.");
+    setLoading(true);
+    try {
+      let updatedUser: User | Trainer = { ...user };
+
+      if (user.role === 'trainer') {
+        const trainerData = data as TrainerProfileUpdateData;
+        await updateTrainerInFirestore(user.id, trainerData);
+        updatedUser = { ...user, ...trainerData } as Trainer;
+      } else {
+        const memberData = data as UserProfileUpdateData;
+        await updateUserInFirestore(user.id, memberData);
+        updatedUser = { ...user, ...memberData } as User;
+      }
+      setUser(updatedUser);
+      localStorage.setItem('fitjourney-user', JSON.stringify(updatedUser));
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      throw error; // Re-throw to be caught by UI
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -206,6 +246,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
+      // onAuthStateChanged will handle setUser(null) and localStorage.removeItem
     } catch (error) {
       console.error("Firebase Logout Error:", error);
     } finally {
@@ -214,7 +255,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, sendPasswordReset, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, sendPasswordReset, updateUserProfile, loading }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,3 +1,4 @@
+
 import type { GeneratePersonalizedPlanOutput } from '@/ai/flows/generate-personalized-plan';
 import type { ACTUAL_PLAN_BMI_CATEGORIES } from '@/lib/constants';
 
@@ -14,6 +15,20 @@ export interface Trainer extends User {
   specializations?: string[];
   avatarUrl?: string;
 }
+
+// Data for updating a member's profile
+export interface UserProfileUpdateData {
+  name?: string;
+}
+
+// Data for updating a trainer's profile
+export interface TrainerProfileUpdateData {
+  name?: string;
+  bio?: string;
+  specializations?: string[]; // Stored as an array, but might be edited as comma-separated string in UI
+  avatarUrl?: string;
+}
+
 
 export interface Exercise {
   id: string;

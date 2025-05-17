@@ -1,13 +1,9 @@
 
-import type { User, Trainer, Plan, Exercise, PlanSpecificBMICategory, AIGeneratedPlan } from '@/types';
+import type { User, Trainer, Plan, Exercise, AIGeneratedPlan, UserProfileUpdateData, TrainerProfileUpdateData, PlanSpecificBMICategory } from '@/types';
 import { db } from './firebase';
 import { collection, query, where, getDocs, doc, getDoc, Timestamp, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp } from 'firebase/firestore';
 import { ACTUAL_PLAN_BMI_CATEGORIES } from './constants';
 
-
-// --- Mock Users & Trainers REMOVED as we are moving to Firebase Auth & Firestore ---
-
-// --- Data Access Functions ---
 
 // Get all published plans with their exercises
 export const getPublishedPlans = async (): Promise<Plan[]> => {
@@ -42,8 +38,8 @@ export const getPublishedPlans = async (): Promise<Plan[]> => {
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName: trainerName || 'Unknown Trainer', 
-      trainerAvatarUrl: trainerAvatarUrl || '', 
+      trainerName: trainerName || 'Unknown Trainer',
+      trainerAvatarUrl: trainerAvatarUrl || '',
     } as Plan);
   }
   return plans;
@@ -64,7 +60,7 @@ export const getPlanById = async (id: string): Promise<Plan | undefined> => {
       ...exDoc.data(),
       planId: id
     } as Exercise));
-    
+
     let trainerName = planData.trainerName;
     let trainerAvatarUrl = planData.trainerAvatarUrl;
 
@@ -80,8 +76,8 @@ export const getPlanById = async (id: string): Promise<Plan | undefined> => {
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName: trainerName || 'Unknown Trainer', 
-      trainerAvatarUrl: trainerAvatarUrl || '', 
+      trainerName: trainerName || 'Unknown Trainer',
+      trainerAvatarUrl: trainerAvatarUrl || '',
     } as Plan;
   }
   return undefined;
@@ -120,8 +116,8 @@ export const getPlansByTrainerId = async (trainerId: string): Promise<Plan[]> =>
       createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
       updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
       exercises,
-      trainerName: trainerName || 'Unknown Trainer', 
-      trainerAvatarUrl: trainerAvatarUrl || '', 
+      trainerName: trainerName || 'Unknown Trainer',
+      trainerAvatarUrl: trainerAvatarUrl || '',
     } as Plan);
   }
   return plans;
@@ -134,9 +130,15 @@ export const getTrainerById = async (id: string): Promise<Trainer | undefined> =
   const trainerDocSnap = await getDoc(trainerDocRef);
 
   if (trainerDocSnap.exists()) {
+    const data = trainerDocSnap.data();
     return {
       id: trainerDocSnap.id, // This is the Firebase UID
-      ...trainerDocSnap.data()
+      name: data.name || '',
+      email: data.email || '',
+      role: 'trainer', // Ensure role is correctly set
+      bio: data.bio || '',
+      specializations: data.specializations || [],
+      avatarUrl: data.avatarUrl || '',
     } as Trainer;
   }
   console.warn(`Trainer profile with ID ${id} not found in Firestore.`);
@@ -146,13 +148,16 @@ export const getTrainerById = async (id: string): Promise<Trainer | undefined> =
 // Get user (member) by ID (Firebase UID)
 export const getUserById = async (id: string): Promise<User | undefined> => {
     if (!id) return undefined;
-    const userDocRef = doc(db, 'users', id); // Assuming 'users' collection for members
+    const userDocRef = doc(db, 'users', id);
     const userDocSnap = await getDoc(userDocRef);
 
     if (userDocSnap.exists()) {
+        const data = userDocSnap.data();
         return {
             id: userDocSnap.id, // This is the Firebase UID
-            ...userDocSnap.data()
+            name: data.name || '',
+            email: data.email || '',
+            role: 'member', // Ensure role is correctly set
         } as User;
     }
     console.warn(`User profile with ID ${id} not found in Firestore 'users' collection.`);
@@ -161,23 +166,22 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
 
 
 export const createPlan = async (
-  planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises'>,
+  planData: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl'>,
   exercisesData: Omit<Exercise, 'id' | 'planId'>[]
 ): Promise<Plan> => {
-  let trainerName = planData.trainerName;
-  let trainerAvatarUrl = planData.trainerAvatarUrl;
+  let trainerNameResolved: string | undefined;
+  let trainerAvatarUrlResolved: string | undefined;
 
-  if (planData.trainerId && (!trainerName || !trainerAvatarUrl)) {
+  if (planData.trainerId) {
     const trainerDetails = await getTrainerById(planData.trainerId);
-    trainerName = trainerDetails?.name;
-    trainerAvatarUrl = trainerDetails?.avatarUrl;
+    trainerNameResolved = trainerDetails?.name;
+    trainerAvatarUrlResolved = trainerDetails?.avatarUrl;
   }
-
 
   const planDocData = {
     ...planData,
-    trainerName: trainerName || 'Unknown Trainer',
-    trainerAvatarUrl: trainerAvatarUrl || '',
+    trainerName: trainerNameResolved || 'Unknown Trainer',
+    trainerAvatarUrl: trainerAvatarUrlResolved || '',
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isPublished: planData.isPublished === undefined ? false : planData.isPublished,
@@ -207,11 +211,11 @@ export const updatePlan = async (
 ): Promise<Plan | undefined> => {
   const planDocRef = doc(db, 'plans', planId);
 
-  const planUpdateData: any = { // Use any for flexibility, will be type-checked by Firestore
+  const planUpdateData: any = {
     ...planData,
     updatedAt: serverTimestamp(),
   };
-  
+
   if(planData.trainerId && (planData.trainerName === undefined || planData.trainerAvatarUrl === undefined)){
       const trainerDetails = await getTrainerById(planData.trainerId);
       planUpdateData.trainerName = trainerDetails?.name || planData.trainerName || 'Unknown Trainer';
@@ -268,32 +272,20 @@ export const saveAIPlanAsNew = async (
   planName: string,
   planDescription: string
 ): Promise<Plan> => {
-  
-  let trainerDetailsName: string | undefined;
-  let trainerDetailsAvatarUrl: string | undefined;
 
-  if (trainerId) {
-    const trainerDetails = await getTrainerById(trainerId);
-    trainerDetailsName = trainerDetails?.name;
-    trainerDetailsAvatarUrl = trainerDetails?.avatarUrl;
-  }
-
-
-  const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises'> = {
+  const planDataForCreation: Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'exercises' | 'trainerName' | 'trainerAvatarUrl'> = {
     name: planName,
     description: planDescription,
     duration: aiPlan.duration,
     goal: aiPlan.goal,
-    rating: 0, 
-    price: 0,  
-    targetAudience: "AI Generated", 
+    rating: 0,
+    price: 0,
+    targetAudience: "AI Generated",
     trainerId: trainerId,
-    trainerName: trainerDetailsName, 
-    trainerAvatarUrl: trainerDetailsAvatarUrl, 
-    ageMin: 18, 
-    ageMax: 65, 
-    bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1]], 
-    isPublished: false, 
+    ageMin: 18,
+    ageMax: 65,
+    bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1] as PlanSpecificBMICategory], // 'Normal'
+    isPublished: false,
   };
 
   const exercisesData: Omit<Exercise, 'id' | 'planId'>[] = aiPlan.exercises.map(ex => ({
@@ -301,8 +293,22 @@ export const saveAIPlanAsNew = async (
     dayOfWeek: ex.day,
     sets: ex.sets,
     reps: ex.reps,
-    instructions: "", 
+    instructions: "",
   }));
 
   return createPlan(planDataForCreation, exercisesData);
+};
+
+// Update a member's profile in Firestore
+export const updateUserInFirestore = async (userId: string, data: UserProfileUpdateData): Promise<void> => {
+  const userDocRef = doc(db, 'users', userId);
+  await updateDoc(userDocRef, data);
+};
+
+// Update a trainer's profile in Firestore
+export const updateTrainerInFirestore = async (trainerId: string, data: TrainerProfileUpdateData): Promise<void> => {
+  const trainerDocRef = doc(db, 'trainers', trainerId);
+  // Make sure to only pass defined fields to updateDoc to avoid overwriting with undefined
+  const updateData = Object.fromEntries(Object.entries(data).filter(([_, v]) => v !== undefined));
+  await updateDoc(trainerDocRef, updateData);
 };
