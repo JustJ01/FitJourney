@@ -95,7 +95,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
   const [showSuggestDialog, setShowSuggestDialog] = useState(false);
   const [modificationRequest, setModificationRequest] = useState("");
   const [aiSuggestedPlanJSON, setAiSuggestedPlanJSON] = useState<string | null>(null);
-  const [aiSuggestedPlanTextual, setAiSuggestedPlanTextual] = useState<string | null>(null); // Renamed
+  const [aiSuggestedPlanTextual, setAiSuggestedPlanTextual] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   const handleAddExercise = () => {
@@ -114,7 +114,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     }
     setIsSuggesting(true);
     setAiSuggestedPlanJSON(null);
-    setAiSuggestedPlanTextual(null); // Updated
+    setAiSuggestedPlanTextual(null);
     try {
       const currentPlanData = form.getValues();
       const planForAI = {
@@ -141,14 +141,14 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
       setAiSuggestedPlanJSON(result.modifiedPlanJSON);
-      setAiSuggestedPlanTextual(result.modifiedPlanTextual); // Updated
+      setAiSuggestedPlanTextual(result.modifiedPlanTextual);
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ title: "AI Suggestion Failed", description: errorMessage, variant: "destructive" });
       setAiSuggestedPlanJSON("Error generating JSON suggestions. " + errorMessage);
-      setAiSuggestedPlanTextual("Error generating textual plan. " + errorMessage); // Updated
+      setAiSuggestedPlanTextual("Error generating textual plan. " + errorMessage);
     } finally {
       setIsSuggesting(false);
     }
@@ -310,7 +310,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                 <Sparkles className="mr-2 h-4 w-4"/> AI Suggestions
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[600px]">
+                        <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>AI Plan Modification Suggestions</DialogTitle>
                                 <DialogDescription>
@@ -333,14 +333,14 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                 <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()}>
                                     {isSuggesting ? "Getting Suggestions..." : <><Wand2 className="mr-2 h-4 w-4" /> Get AI Suggestions</>}
                                 </Button>
-                                {aiSuggestedPlanTextual && ( // Updated
+                                {aiSuggestedPlanTextual && (
                                     <div className="mt-4 space-y-2">
                                         <Label htmlFor="aiSuggestedPlanTextualOutput">AI Suggested Plan (Narrative):</Label> 
                                         <Textarea
                                             id="aiSuggestedPlanTextualOutput"
-                                            value={aiSuggestedPlanTextual} // Updated
+                                            value={aiSuggestedPlanTextual}
                                             readOnly
-                                            rows={8} // Increased rows
+                                            rows={8}
                                             className="mt-1 font-sans text-sm bg-muted/50"
                                         />
                                          <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanTextual || "")}>
