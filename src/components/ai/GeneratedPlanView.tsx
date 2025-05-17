@@ -27,6 +27,15 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
   const [planName, setPlanName] = useState(plan?.goal ? `AI: ${plan.goal}` : "AI Generated Plan");
   const [planDescription, setPlanDescription] = useState(plan?.goal ? `An AI generated plan focusing on ${plan.goal}. Duration: ${plan?.duration}.` : "Customizable AI generated plan.");
 
+  // Update default name/description if plan prop changes (e.g., after regeneration)
+  useState(() => {
+    if (plan) {
+        setPlanName(plan.goal ? `AI: ${plan.goal}` : "AI Generated Plan");
+        setPlanDescription(plan.goal ? `An AI generated plan focusing on ${plan.goal}. Duration: ${plan?.duration}.` : "Customizable AI generated plan.");
+    }
+  });
+
+
   if (!plan) {
     return null;
   }
@@ -170,3 +179,4 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
 };
 
 export default GeneratedPlanView;
+
