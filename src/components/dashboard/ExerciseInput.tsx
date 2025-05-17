@@ -9,17 +9,22 @@ import { Trash2 } from 'lucide-react';
 import { DAYS_OF_WEEK } from '@/lib/constants';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
+import React from 'react'; // Import React
 
 interface ExerciseInputProps {
-  exercise: Partial<Omit<Exercise, 'id' | 'planId'>>; // Use partial for new/editing exercises
+  exercise: Partial<Omit<Exercise, 'id' | 'planId'>>;
   index: number;
   onExerciseChange: (index: number, field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => void;
-  onRemoveExercise: (index: number) => void;
+  onRemoveExercise: (index: number) => void; // Keep original signature for clarity from PlanForm perspective
 }
 
-const ExerciseInput: React.FC<ExerciseInputProps> = ({ exercise, index, onExerciseChange, onRemoveExercise }) => {
+const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ exercise, index, onExerciseChange, onRemoveExercise }) => {
   const handleInputChange = (field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => {
     onExerciseChange(index, field, value);
+  };
+
+  const handleRemove = () => {
+    onRemoveExercise(index);
   };
 
   return (
@@ -90,7 +95,7 @@ const ExerciseInput: React.FC<ExerciseInputProps> = ({ exercise, index, onExerci
         type="button"
         variant="ghost"
         size="icon"
-        onClick={() => onRemoveExercise(index)}
+        onClick={handleRemove} // Use the memoized handler
         className="absolute top-2 right-2 text-destructive hover:bg-destructive/10 h-7 w-7"
         aria-label="Remove exercise"
       >
@@ -98,6 +103,8 @@ const ExerciseInput: React.FC<ExerciseInputProps> = ({ exercise, index, onExerci
       </Button>
     </div>
   );
-};
+});
+
+ExerciseInput.displayName = 'ExerciseInput'; // Good practice for React.memo components
 
 export default ExerciseInput;

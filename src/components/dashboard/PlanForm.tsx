@@ -18,7 +18,7 @@ import { PlusCircle, Save, Trash2, Activity, Sparkles, Wand2 } from "lucide-reac
 import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE, ACTUAL_PLAN_BMI_CATEGORIES } from "@/lib/constants";
 import { Separator } from "../ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react"; // Import useCallback
 import { suggestPlanModifications, type SuggestPlanModificationsInput, type SuggestPlanModificationsOutput } from "@/ai/flows/suggest-plan-modifications";
 import { toast } from "@/hooks/use-toast";
 import { Label } from "@/components/ui/label";
@@ -102,10 +102,20 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     append({ name: "", dayOfWeek: "Monday", sets: 3, reps: "10-12", instructions: "" });
   };
 
-  const handleExerciseChange = (index: number, field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => {
-    const currentExercise = fields[index];
-    update(index, { ...currentExercise, [field]: value });
-  };
+  const handleExerciseChange = useCallback((index: number, field: keyof Omit<Exercise, 'id' | 'planId'>, value: string | number) => {
+    // It's generally safer to get the latest exercises array directly from form state
+    // if other asynchronous updates to the form could happen.
+    const currentExercises = form.getValues("exercises");
+    const specificExercise = currentExercises[index];
+    if (specificExercise) {
+        // Create a new object for the exercise to ensure react-hook-form detects the change
+        const updatedExercise = { ...specificExercise, [field]: value };
+        update(index, updatedExercise);
+    }
+  }, [form, update]); // `form` and `update` should be stable
+
+  // The `remove` function from useFieldArray is already stable.
+  // The ExerciseInput component will call remove(index).
 
   const handleRequestAISuggestions = async () => {
     if (!modificationRequest.trim()) {
@@ -381,11 +391,11 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                 )}
                 {fields.map((field, index) => (
                 <ExerciseInput
-                    key={field.id || `new-${index}`} 
+                    key={field.id} // field.id is stable and provided by useFieldArray
                     exercise={field}
                     index={index}
-                    onExerciseChange={handleExerciseChange}
-                    onRemoveExercise={() => remove(index)}
+                    onExerciseChange={handleExerciseChange} // Memoized callback
+                    onRemoveExercise={remove} // Pass stable `remove` function directly
                 />
                 ))}
                 <Button type="button" variant="outline" onClick={handleAddExercise} className="w-full sm:w-auto">
