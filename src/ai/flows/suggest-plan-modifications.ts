@@ -28,9 +28,9 @@ const SuggestPlanModificationsOutputSchema = z.object({
   modifiedPlanJSON: z
     .string()
     .describe('The modified fitness plan in JSON format. This should be a complete JSON object representing the updated plan.'),
-  modificationSummary: z
+  modifiedPlanTextual: z // Renamed from modificationSummary
     .string()
-    .describe('A human-readable summary of the changes made and a brief overview of the modified plan. This should be a textual description, not JSON.'),
+    .describe('A full, human-readable, textual/narrative representation of the entire modified fitness plan. This should describe the plan in detail, similar to how a trainer might write it out for a client, not just a summary of what changed. This should be a textual description, not JSON.'),
 });
 export type SuggestPlanModificationsOutput = z.infer<
   typeof SuggestPlanModificationsOutputSchema
@@ -57,7 +57,7 @@ Modification Request:
 
 Please provide two outputs:
 1.  The full modified plan in valid JSON format under the key 'modifiedPlanJSON'.
-2.  A human-readable summary of the key modifications and an overview of the new plan structure under the key 'modificationSummary'.
+2.  A full, human-readable, textual/narrative representation of the *entire* modified fitness plan under the key 'modifiedPlanTextual'. This output should describe the plan in detail, similar to how a trainer might write out the full plan for a client. It should not be just a summary of the changes, but the complete modified plan in a descriptive text format.
 
 Ensure the output is a single JSON object containing these two keys.`,
 });

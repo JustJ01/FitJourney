@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Removed SelectLabel as it's part of SelectPrimitive.Label
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -95,7 +95,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
   const [showSuggestDialog, setShowSuggestDialog] = useState(false);
   const [modificationRequest, setModificationRequest] = useState("");
   const [aiSuggestedPlanJSON, setAiSuggestedPlanJSON] = useState<string | null>(null);
-  const [aiSuggestedSummary, setAiSuggestedSummary] = useState<string | null>(null);
+  const [aiSuggestedPlanTextual, setAiSuggestedPlanTextual] = useState<string | null>(null); // Renamed
   const [isSuggesting, setIsSuggesting] = useState(false);
 
   const handleAddExercise = () => {
@@ -114,7 +114,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     }
     setIsSuggesting(true);
     setAiSuggestedPlanJSON(null);
-    setAiSuggestedSummary(null);
+    setAiSuggestedPlanTextual(null); // Updated
     try {
       const currentPlanData = form.getValues();
       const planForAI = {
@@ -141,14 +141,14 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
       setAiSuggestedPlanJSON(result.modifiedPlanJSON);
-      setAiSuggestedSummary(result.modificationSummary);
+      setAiSuggestedPlanTextual(result.modifiedPlanTextual); // Updated
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ title: "AI Suggestion Failed", description: errorMessage, variant: "destructive" });
       setAiSuggestedPlanJSON("Error generating JSON suggestions. " + errorMessage);
-      setAiSuggestedSummary("Error generating summary. " + errorMessage);
+      setAiSuggestedPlanTextual("Error generating textual plan. " + errorMessage); // Updated
     } finally {
       setIsSuggesting(false);
     }
@@ -333,18 +333,18 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                 <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()}>
                                     {isSuggesting ? "Getting Suggestions..." : <><Wand2 className="mr-2 h-4 w-4" /> Get AI Suggestions</>}
                                 </Button>
-                                {aiSuggestedSummary && (
+                                {aiSuggestedPlanTextual && ( // Updated
                                     <div className="mt-4 space-y-2">
-                                        <Label htmlFor="aiSuggestedSummaryOutput">AI Suggested Summary:</Label>
+                                        <Label htmlFor="aiSuggestedPlanTextualOutput">AI Suggested Plan (Narrative):</Label> 
                                         <Textarea
-                                            id="aiSuggestedSummaryOutput"
-                                            value={aiSuggestedSummary}
+                                            id="aiSuggestedPlanTextualOutput"
+                                            value={aiSuggestedPlanTextual} // Updated
                                             readOnly
-                                            rows={6}
+                                            rows={8} // Increased rows
                                             className="mt-1 font-sans text-sm bg-muted/50"
                                         />
-                                         <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedSummary)}>
-                                            Copy Summary
+                                         <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanTextual || "")}>
+                                            Copy Narrative Plan
                                         </Button>
                                     </div>
                                 )}
@@ -406,7 +406,3 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
 };
 
 export default PlanForm;
-
-    
-
-      
