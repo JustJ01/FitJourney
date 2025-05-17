@@ -11,10 +11,11 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import Link from 'next/link'; // Import Link
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState(''); // Added password state
+  const [password, setPassword] = useState('');
   const [role, setRole] = useState<'member' | 'trainer'>('member');
   const { login, loading } = useAuth();
   const router = useRouter();
@@ -25,12 +26,12 @@ export default function LoginPage() {
       toast({ title: "Login Error", description: "Please enter an email address.", variant: "destructive" });
       return;
     }
-    if (!password) { // Added password validation
+    if (!password) { 
       toast({ title: "Login Error", description: "Please enter a password.", variant: "destructive" });
       return;
     }
     try {
-      await login(email, password, role); // Pass email, password, and role
+      await login(email, password, role); 
       toast({ title: "Login Successful", description: `Welcome back to ${APP_NAME}!` });
       router.push(role === 'trainer' ? '/dashboard' : '/plans');
     } catch (error: any) {
@@ -62,7 +63,7 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-2"> {/* Added Password Field */}
+            <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
@@ -91,12 +92,13 @@ export default function LoginPage() {
             </div>
 
             <Button type="submit" className="w-full text-lg py-6" disabled={loading}>
-              {loading ? 'Logging in...' : 'Login / Register'}
+              {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
         </CardContent>
-        <CardFooter className="text-center text-sm text-muted-foreground">
-          <p>Connects to Firebase Authentication.</p>
+        <CardFooter className="text-center text-sm text-muted-foreground flex-col space-y-2">
+           <p>Don't have an account? <Button variant="link" className="p-0 h-auto" asChild><Link href="/register">Sign up</Link></Button></p>
+          <p>Connects to Firebase Authentication & Firestore.</p>
         </CardFooter>
       </Card>
     </div>

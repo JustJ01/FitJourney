@@ -1,4 +1,3 @@
-
 import type { GeneratePersonalizedPlanOutput } from '@/ai/flows/generate-personalized-plan';
 import type { ACTUAL_PLAN_BMI_CATEGORIES } from '@/lib/constants';
 
