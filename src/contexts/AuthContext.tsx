@@ -7,18 +7,20 @@ import { auth, db } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, // Import createUserWithEmailAndPassword
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail, // Import sendPasswordResetEmail
   signOut as firebaseSignOut, 
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore'; // Import setDoc
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { getUserById, getTrainerById } from '@/lib/data';
 
 interface AuthContextType {
   user: User | Trainer | null;
   login: (email: string, password: string, roleAttempt: 'member' | 'trainer') => Promise<void>;
-  register: (name: string, email: string, password: string, role: 'member' | 'trainer') => Promise<void>; // Add register
+  register: (name: string, email: string, password: string, role: 'member' | 'trainer') => Promise<void>;
   logout: () => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>; // Add sendPasswordReset
   loading: boolean;
 }
 
@@ -52,11 +54,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }
         
         if (!appUser) {
-            // Try to determine role. If just registered, localStorage won't have the role hint.
-            // Attempt to fetch trainer first, then member.
-            // This logic might need refinement if the user's role changes or is not set during registration.
             let fetchedProfile = await getTrainerById(firebaseUser.uid);
-            if (fetchedProfile && fetchedProfile.role === 'trainer') { // Double check role from Firestore
+            if (fetchedProfile && fetchedProfile.role === 'trainer') {
                 appUser = {
                     ...fetchedProfile,
                     id: firebaseUser.uid,
@@ -80,8 +79,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(appUser);
           localStorage.setItem('fitjourney-user', JSON.stringify(appUser));
         } else {
-          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore. This can happen if registration didn't complete Firestore profile creation.`);
-          // Fallback to basic Firebase user info, but this user won't have app-specific role functionality.
+          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore.`);
            setUser({ id: firebaseUser.uid, email: firebaseUser.email || "", name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || "User", role: 'member' }); 
         }
 
@@ -102,10 +100,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const firebaseUser = userCredential.user;
       let appUser: User | Trainer | null = null;
 
-      // Fetch profile based on roleAttempt from Firestore
       if (roleAttempt === 'trainer') {
         const trainerProfile = await getTrainerById(firebaseUser.uid);
-        if (trainerProfile && trainerProfile.role === 'trainer') { // Ensure fetched profile also has trainer role
+        if (trainerProfile && trainerProfile.role === 'trainer') {
           appUser = { 
             ...trainerProfile, 
             id: firebaseUser.uid, 
@@ -113,12 +110,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             role: 'trainer'
           };
         } else {
-          await firebaseSignOut(auth); // Sign out if role doesn't match
+          await firebaseSignOut(auth);
           throw new Error(`Trainer profile not found for ${email} or role mismatch.`);
         }
       } else { 
         const memberProfile = await getUserById(firebaseUser.uid);
-        if (memberProfile && memberProfile.role === 'member') { // Ensure fetched profile also has member role
+        if (memberProfile && memberProfile.role === 'member') {
           appUser = { 
             ...memberProfile, 
             id: firebaseUser.uid, 
@@ -126,7 +123,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             role: 'member' 
           };
         } else {
-           await firebaseSignOut(auth); // Sign out if role doesn't match
+           await firebaseSignOut(auth);
           throw new Error(`Member profile not found for ${email} or role mismatch.`);
         }
       }
@@ -153,11 +150,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      // Create profile in Firestore
       const userProfileData = {
-        id: firebaseUser.uid, // Not strictly needed in document data if ID is the doc ID
         name,
-        email: firebaseUser.email, // Use email from Firebase Auth user
+        email: firebaseUser.email,
         role,
       };
 
@@ -165,20 +160,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         const trainerDocRef = doc(db, 'trainers', firebaseUser.uid);
         await setDoc(trainerDocRef, {
           ...userProfileData,
-          // Add any default trainer-specific fields if needed, e.g., bio: "", specializations: []
           bio: "",
           specializations: [],
-          avatarUrl: "", // Default or placeholder
+          avatarUrl: "",
         });
-      } else { // 'member'
+      } else {
         const userDocRef = doc(db, 'users', firebaseUser.uid);
         await setDoc(userDocRef, userProfileData);
       }
-
-      // onAuthStateChanged will handle setting the user state
-      // No need to call setUser or localStorage here directly, as onAuthStateChanged will pick up the new user
-      // and fetch the profile.
-
       setLoading(false);
     } catch (error: any) {
       setLoading(false);
@@ -186,7 +175,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error.code === 'auth/email-already-in-use') {
         throw new Error("This email address is already in use.");
       } else if (error.code === 'auth/weak-password') {
-        throw new Error("Password is too weak. It should be at least 6 characters.");
+        throw new Error("Password should be at least 6 characters.");
       } else if (error.code === 'auth/invalid-email') {
         throw new Error("The email address is not valid.");
       }
@@ -194,11 +183,29 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const sendPasswordReset = async (email: string) => {
+    setLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, email);
+      setLoading(false);
+    } catch (error: any) {
+      setLoading(false);
+      console.error("Password Reset Error:", error);
+      if (error.code === 'auth/invalid-email') {
+        throw new Error("The email address is not valid.");
+      } else if (error.code === 'auth/user-not-found') {
+        // Don't reveal if user exists, for security. Firebase handles this, but good to be aware.
+        // The toast message in the component is generic for this reason.
+         throw new Error("If your email is registered, you will receive a reset link.");
+      }
+      throw new Error(error.message || "Could not send password reset email.");
+    }
+  };
+
   const logout = async () => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // setUser(null) and localStorage clear is handled by onAuthStateChanged
     } catch (error) {
       console.error("Firebase Logout Error:", error);
     } finally {
@@ -207,7 +214,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, loading }}>
+    <AuthContext.Provider value={{ user, login, register, logout, sendPasswordReset, loading }}>
       {children}
     </AuthContext.Provider>
   );

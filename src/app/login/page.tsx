@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import Link from 'next/link'; // Import Link
+import Link from 'next/link';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -64,7 +64,12 @@ export default function LoginPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="password">Password</Label>
+                <Button variant="link" size="sm" className="p-0 h-auto text-xs" asChild>
+                  <Link href="/forgot-password">Forgot Password?</Link>
+                </Button>
+              </div>
               <Input
                 id="password"
                 type="password"
