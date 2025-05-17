@@ -66,8 +66,7 @@ const UserNav = () => {
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
           <DropdownMenuItem asChild className="cursor-pointer">
-             {/* Placeholder for profile page */}
-            <Link href="#"> 
+            <Link href="/profile"> 
               <UserCircle className="mr-2 h-4 w-4" />
               <span>Profile</span>
             </Link>
