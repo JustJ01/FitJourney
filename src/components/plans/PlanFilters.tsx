@@ -1,6 +1,7 @@
 
 "use client";
 
+import { useState, useEffect } from 'react'; // Import useState and useEffect
 import type { PlanFilters, BMICategory } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +12,7 @@ import { BMI_CATEGORIES, PLAN_DURATIONS, DEFAULT_AGE_RANGE, DEFAULT_PRICE_RANGE 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Filter, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 interface PlanFiltersProps {
   filters: PlanFilters;
@@ -19,7 +21,12 @@ interface PlanFiltersProps {
 }
 
 const PlanFiltersComponent: React.FC<PlanFiltersProps> = ({ filters, onFilterChange, onResetFilters }) => {
-  
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const handleSliderChange = (field: 'ageRange' | 'price', value: [number, number]) => {
     onFilterChange({ [field]: value });
   };
@@ -53,15 +60,24 @@ const PlanFiltersComponent: React.FC<PlanFiltersProps> = ({ filters, onFilterCha
           <AccordionItem value="age">
             <AccordionTrigger className="text-base font-semibold">Age Range</AccordionTrigger>
             <AccordionContent className="pt-4 space-y-2">
-              <Label>Ages: {filters.ageRange[0]} - {filters.ageRange[1]}</Label>
-              <Slider
-                min={10}
-                max={100}
-                step={1}
-                value={filters.ageRange}
-                onValueChange={(value) => handleSliderChange('ageRange', value)}
-                className="my-2"
-              />
+              {isMounted ? (
+                <>
+                  <Label>Age: {filters.ageRange[0]} - {filters.ageRange[1]}</Label>
+                  <Slider
+                    min={DEFAULT_AGE_RANGE[0]}
+                    max={DEFAULT_AGE_RANGE[1]}
+                    step={1}
+                    value={filters.ageRange}
+                    onValueChange={(value) => handleSliderChange('ageRange', value)}
+                    className="my-2"
+                  />
+                </>
+              ) : (
+                <>
+                  <Skeleton className="h-5 w-32 mb-2" /> {/* Skeleton for Label */}
+                  <Skeleton className="h-5 w-full my-2" /> {/* Skeleton for Slider */}
+                </>
+              )}
             </AccordionContent>
           </AccordionItem>
 

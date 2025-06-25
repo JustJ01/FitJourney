@@ -4,6 +4,7 @@
 import Logo from './Logo';
 import MainNav from './MainNav';
 import UserNav from './UserNav';
+import ThemeToggleButton from './ThemeToggleButton'; // Import ThemeToggleButton
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
@@ -22,6 +23,7 @@ const Header = () => {
         </div>
         <MainNav />
         <div className="flex items-center gap-2">
+          <ThemeToggleButton /> {/* Add ThemeToggleButton here */}
           <UserNav />
           <div className="md:hidden">
             <MobileNavClientWrapper />

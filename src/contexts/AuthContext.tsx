@@ -46,7 +46,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           try {
             const storedUser = JSON.parse(storedUserString);
             if (storedUser && storedUser.id === firebaseUser.uid) {
-              appUser = storedUser; // Use cached user initially
+              appUser = storedUser; 
             }
           } catch (e) {
             console.error("Failed to parse stored user:", e);
@@ -54,36 +54,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         }
         
-        // Always try to fetch fresh data, especially role which might be stored in LS
-        // The role is crucial for determining which Firestore collection to query
-        let roleToFetch: 'member' | 'trainer' = 'member'; // Default
+        let roleToFetch: 'member' | 'trainer' = 'member'; 
         if (appUser) {
             roleToFetch = appUser.role;
         } else {
-            // If no cached user, we can't reliably know the role without asking again or storing it differently.
-            // For now, we'll attempt to guess based on typical scenarios or rely on a default.
-            // This part might need refinement based on UX (e.g. store attempted role during login process temporarily)
-            // As a fallback, try trainer first if it's a common path for returning users.
-            // A more robust solution might involve storing the intended role after first login/registration.
-            const trainerProfile = await getTrainerById(firebaseUser.uid);
-            if (trainerProfile) roleToFetch = 'trainer';
+            const trainerProfileCheck = await getTrainerById(firebaseUser.uid);
+            if (trainerProfileCheck) {
+                roleToFetch = 'trainer';
+            } else {
+                const memberProfileCheck = await getUserById(firebaseUser.uid);
+                if (memberProfileCheck) {
+                    roleToFetch = 'member';
+                } else {
+                    console.warn(`No user profile found for UID ${firebaseUser.uid} in either trainers or users collection during initial auth check.`);
+                }
+            }
         }
-
 
         if (roleToFetch === 'trainer') {
             const trainerProfile = await getTrainerById(firebaseUser.uid);
             if (trainerProfile) {
                  appUser = {
-                    ...trainerProfile, // This now comes from Firestore directly
+                    ...trainerProfile, 
                     id: firebaseUser.uid,
-                    email: firebaseUser.email || trainerProfile.email, // Prefer Firebase Auth email
+                    email: firebaseUser.email || trainerProfile.email, 
                 };
             }
-        } else {
+        } else { 
             const memberProfile = await getUserById(firebaseUser.uid);
              if (memberProfile) {
                 appUser = {
-                    ...memberProfile, // From Firestore
+                    ...memberProfile, 
                     id: firebaseUser.uid,
                     email: firebaseUser.email || memberProfile.email,
                 };
@@ -94,8 +95,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           setUser(appUser);
           localStorage.setItem('fitjourney-user', JSON.stringify(appUser));
         } else {
-          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore for role ${roleToFetch}. Logging out.`);
-          await firebaseSignOut(auth); // Log out if no profile
+          console.warn(`User ${firebaseUser.uid} authenticated with Firebase, but no matching profile found in Firestore for determined role ${roleToFetch}. Logging out.`);
+          await firebaseSignOut(auth); 
           setUser(null);
           localStorage.removeItem('fitjourney-user');
         }
@@ -167,10 +168,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      const userProfileData = {
+      const userProfileData: Partial<User | Trainer> = {
         name,
-        email: firebaseUser.email, // Store email in profile as well
+        email: firebaseUser.email, 
         role,
+        avatarUrl: "", 
       };
 
       if (role === 'trainer') {
@@ -179,11 +181,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           ...userProfileData,
           bio: "",
           specializations: [],
-          avatarUrl: "",
-        });
-      } else {
+        } as Omit<Trainer, 'id'>);
+      } else { 
         const userDocRef = doc(db, 'users', firebaseUser.uid);
-        await setDoc(userDocRef, userProfileData);
+        await setDoc(userDocRef, userProfileData as Omit<User, 'id'>);
       }
       setLoading(false);
     } catch (error: any) {
@@ -221,22 +222,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!user) throw new Error("User not logged in.");
     setLoading(true);
     try {
-      let updatedUser: User | Trainer = { ...user };
+      // Create a clean object to send to Firestore, filtering out undefined values.
+      const firestoreUpdateData: Partial<User | Trainer> = Object.fromEntries(
+        Object.entries(data).filter(([_, v]) => v !== undefined)
+      );
 
       if (user.role === 'trainer') {
-        const trainerData = data as TrainerProfileUpdateData;
-        await updateTrainerInFirestore(user.id, trainerData);
-        updatedUser = { ...user, ...trainerData } as Trainer;
-      } else {
-        const memberData = data as UserProfileUpdateData;
-        await updateUserInFirestore(user.id, memberData);
-        updatedUser = { ...user, ...memberData } as User;
+        await updateTrainerInFirestore(user.id, firestoreUpdateData as TrainerProfileUpdateData);
+      } else { 
+        await updateUserInFirestore(user.id, firestoreUpdateData as UserProfileUpdateData);
       }
+      
+      const updatedUser = { ...user, ...firestoreUpdateData };
       setUser(updatedUser);
       localStorage.setItem('fitjourney-user', JSON.stringify(updatedUser));
+
     } catch (error) {
       console.error("Error updating profile:", error);
-      throw error; // Re-throw to be caught by UI
+      throw error; 
     } finally {
       setLoading(false);
     }
@@ -246,7 +249,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setLoading(true);
     try {
       await firebaseSignOut(auth);
-      // onAuthStateChanged will handle setUser(null) and localStorage.removeItem
     } catch (error) {
       console.error("Firebase Logout Error:", error);
     } finally {

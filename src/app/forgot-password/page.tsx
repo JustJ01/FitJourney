@@ -9,12 +9,12 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth'; // Import useAuth
+import { useAuth } from '@/hooks/useAuth'; 
 import { MailQuestion } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
-  const { sendPasswordReset, loading } = useAuth(); // Get sendPasswordReset from useAuth
+  const { sendPasswordReset, loading } = useAuth(); 
   const [messageSent, setMessageSent] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
       await sendPasswordReset(email);
       toast({ title: "Password Reset Email Sent", description: "If an account exists for this email, a password reset link has been sent." });
       setMessageSent(true);
-      setEmail(''); // Clear email field
+      setEmail(''); 
     } catch (error: any) {
       const errorMessage = error.message || "Could not send password reset email. Please try again.";
       toast({ title: "Error", description: errorMessage, variant: "destructive" });

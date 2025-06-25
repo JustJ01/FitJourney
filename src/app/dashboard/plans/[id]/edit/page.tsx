@@ -33,7 +33,7 @@ export default function EditPlanPage() {
           if (plan) {
             if (user && plan.trainerId !== user.id) {
                  setError("You are not authorized to edit this plan.");
-                 setInitialPlanData(null); // Ensure form doesn't load with other's data
+                 setInitialPlanData(null); 
             } else {
                  setInitialPlanData(plan);
             }
@@ -51,7 +51,7 @@ export default function EditPlanPage() {
     }
   }, [planId, user]);
 
-  const handleSubmit = async (data: PlanFormData) => {
+  const handleSubmit = async (data: PlanFormData, newImageUrl?: string, removeImage?: boolean) => {
     if (!user || user.role !== 'trainer' || !initialPlanData) {
       toast({ title: "Error", description: "Unauthorized or plan data missing.", variant: "destructive" });
       return;
@@ -71,8 +71,17 @@ export default function EditPlanPage() {
         instructions: ex.instructions || "",
       }));
 
-      const planDataForApi = { ...data };
-      delete (planDataForApi as any).trainerId; // Don't allow changing trainerId via form
+      // Prepare data for API: data already contains most fields from the form
+      const planDataForApi = { ...data }; 
+      // trainerId should not be changed here, it's part of initialPlanData and set by system
+      delete (planDataForApi as any).trainerId;
+
+ 
+      
+      const finalImageUrl = newImageUrl !== undefined ? newImageUrl : (removeImage ? "" : initialPlanData.imageUrl);
+      
+      planDataForApi.imageUrl = finalImageUrl;
+
 
       await updatePlan(planId, planDataForApi, exercisesToSave);
       toast({ title: "Plan Updated!", description: `${data.name} has been successfully updated.` });
@@ -107,7 +116,6 @@ export default function EditPlanPage() {
   }
 
   if (!initialPlanData) {
-     // Should be caught by error state if plan not found, but good fallback
     return <p>Plan not found or you are not authorized to edit it.</p>;
   }
   
@@ -121,7 +129,6 @@ export default function EditPlanPage() {
     );
   }
 
-
   return (
     <div className="max-w-4xl mx-auto">
       <PlanForm
@@ -133,4 +140,3 @@ export default function EditPlanPage() {
     </div>
   );
 }
-

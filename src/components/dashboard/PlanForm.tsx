@@ -14,22 +14,23 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import ExerciseInput from "./ExerciseInput";
-import { PlusCircle, Save, Trash2, Activity, Sparkles, Wand2 } from "lucide-react";
+import { PlusCircle, Save, Trash2, Activity, Sparkles, Wand2, DownloadCloud, Image as ImageIcon, UploadCloud, XCircle } from "lucide-react";
 import { BMI_CATEGORIES, FITNESS_GOALS, PLAN_DURATIONS, DEFAULT_AGE_RANGE, ACTUAL_PLAN_BMI_CATEGORIES } from "@/lib/constants";
 import { Separator } from "../ui/separator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import React, { useState, useCallback } from "react"; 
+import React, { useState, useCallback, useEffect } from "react"; 
 import { suggestPlanModifications, type SuggestPlanModificationsInput, type SuggestPlanModificationsOutput } from "@/ai/flows/suggest-plan-modifications";
 import { toast } from "@/hooks/use-toast";
-import { Label } from "@/components/ui/label"; // Ensure Label is imported if used outside FormField
+import { Label } from "@/components/ui/label"; 
+import NextImage from 'next/image';
 
 const exerciseSchema = z.object({
-  id: z.string().optional(), // For existing exercises from initialData
+  id: z.string().optional(), 
   name: z.string().min(1, "Exercise name is required."),
   dayOfWeek: z.string().min(1, "Day of week is required."),
   sets: z.coerce.number().min(1, "Sets must be at least 1."),
   reps: z.string().min(1, "Reps description is required."),
-  instructions: z.string().optional().default(""), // Provide default for optional string
+  instructions: z.string().optional().default(""),
 });
 
 const planFormSchema = z.object({
@@ -42,6 +43,7 @@ const planFormSchema = z.object({
   ageMin: z.coerce.number().min(10).max(100),
   ageMax: z.coerce.number().min(10).max(100),
   bmiCategories: z.array(z.enum(ACTUAL_PLAN_BMI_CATEGORIES)).min(1, "At least one BMI category must be selected."),
+  imageUrl: z.string().optional().default(""),
   exercises: z.array(exerciseSchema).optional().default([]),
   isPublished: z.boolean().optional().default(false),
 }).refine(data => data.ageMin <= data.ageMax, {
@@ -53,23 +55,26 @@ export type PlanFormData = z.infer<typeof planFormSchema>;
 
 interface PlanFormProps {
   initialData?: Plan; 
-  onSubmit: (data: PlanFormData) => Promise<void>;
-  isSubmitting: boolean;
+  onSubmit: (data: PlanFormData, newImageUrl?: string, removeImage?: boolean) => Promise<void>;
+  isSubmitting: boolean; // This prop comes from the parent page (CreatePlanPage/EditPlanPage)
   submitButtonText?: string;
 }
 
 const bmiCategoriesForForm = BMI_CATEGORIES.filter(c => c !== 'All') as PlanSpecificBMICategory[];
 
+const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit: onSubmitFromProps, isSubmitting: parentIsSubmitting, submitButtonText = "Save Plan" }) => {
+  const [planImageFile, setPlanImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
+  const [markImageForRemoval, setMarkImageForRemoval] = useState(false);
+  const [localIsSubmitting, setLocalIsSubmitting] = useState(false); // Local submitting state for image upload
 
-const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting, submitButtonText = "Save Plan" }) => {
   const form = useForm<PlanFormData>({
     resolver: zodResolver(planFormSchema),
     defaultValues: initialData ? {
       ...initialData,
-      // rating is part of initialData (Plan type), but not in PlanFormData anymore.
-      // If needed for display in form, it would require separate handling. For now, it's simply not part of the form.
+      imageUrl: initialData.imageUrl || "",
       exercises: (initialData.exercises || []).map(ex => ({
-        id: ex.id, // Keep id if present for existing exercises
+        id: ex.id, 
         name: ex.name || "",
         dayOfWeek: ex.dayOfWeek || "Monday",
         sets: ex.sets || 0, 
@@ -88,10 +93,18 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
       ageMin: DEFAULT_AGE_RANGE[0],
       ageMax: DEFAULT_AGE_RANGE[1],
       bmiCategories: ['Normal'] as PlanSpecificBMICategory[],
+      imageUrl: "",
       exercises: [],
       isPublished: false,
     },
   });
+  
+  useEffect(() => {
+    if (initialData?.imageUrl && !planImageFile) {
+      setImagePreview(initialData.imageUrl);
+      form.setValue('imageUrl', initialData.imageUrl);
+    }
+  }, [initialData?.imageUrl, planImageFile, form]);
 
   const { fields, append, remove } = useFieldArray({
     control: form.control,
@@ -103,6 +116,58 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
   const [aiSuggestedPlanJSON, setAiSuggestedPlanJSON] = useState<string | null>(null);
   const [aiSuggestedPlanTextual, setAiSuggestedPlanTextual] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
+  const [isApplyingSuggestions, setIsApplyingSuggestions] = useState(false);
+
+  const handleImageFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setPlanImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+      form.setValue('imageUrl', ''); 
+      setMarkImageForRemoval(false);
+    }
+  };
+
+  const handleRemoveImage = () => {
+    setPlanImageFile(null);
+    setImagePreview(null);
+    form.setValue('imageUrl', ''); 
+    setMarkImageForRemoval(true);
+  };
+
+  const handleFormSubmit = async (data: PlanFormData) => {
+    setLocalIsSubmitting(true);
+    let uploadedImageUrl: string | undefined = data.imageUrl; // Keep existing if no new file & not removing
+    let imageShouldBeRemoved = markImageForRemoval;
+
+    if (planImageFile) {
+      const formData = new FormData();
+      formData.append('file', planImageFile);
+      try {
+        const response = await fetch('/api/upload-image', {
+          method: 'POST',
+          body: formData,
+        });
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Image upload failed');
+        }
+        const result = await response.json();
+        uploadedImageUrl = result.secure_url;
+        imageShouldBeRemoved = false; 
+      } catch (error) {
+        console.error("Failed to upload image to Cloudinary via API:", error);
+        toast({ title: "Image Upload Failed", description: (error as Error).message, variant: "destructive" });
+        setLocalIsSubmitting(false);
+        return;
+      }
+    } else if (markImageForRemoval) {
+        uploadedImageUrl = ""; // Explicitly set to empty string to signify removal
+    }
+    
+    await onSubmitFromProps(data, uploadedImageUrl, imageShouldBeRemoved);
+    setLocalIsSubmitting(false);
+  };
 
   const handleAddExercise = () => {
     append({ name: "", dayOfWeek: "Monday", sets: 3, reps: "10-12", instructions: "" });
@@ -118,7 +183,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
     setAiSuggestedPlanTextual(null);
     try {
       const currentPlanData = form.getValues();
-      const planForAI = { // This object matches the AI flow's expected input implicitly, rating is not included
+      const planForAI = { 
         name: currentPlanData.name,
         description: currentPlanData.description,
         duration: currentPlanData.duration,
@@ -127,12 +192,15 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
         ageMin: currentPlanData.ageMin,
         ageMax: currentPlanData.ageMax,
         bmiCategories: currentPlanData.bmiCategories,
+        price: currentPlanData.price,
+        isPublished: currentPlanData.isPublished,
+        imageUrl: imagePreview || currentPlanData.imageUrl,
         exercises: currentPlanData.exercises.map(ex => ({
           name: ex.name,
           dayOfWeek: ex.dayOfWeek,
           sets: ex.sets,
           reps: ex.reps,
-          instructions: ex.instructions
+          instructions: ex.instructions,
         })),
       };
       
@@ -141,24 +209,83 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
         modificationRequest: modificationRequest,
       };
       const result: SuggestPlanModificationsOutput = await suggestPlanModifications(input);
+      
       setAiSuggestedPlanJSON(result.modifiedPlanJSON);
       setAiSuggestedPlanTextual(result.modifiedPlanTextual);
+
       toast({ title: "AI Suggestions Ready", description: "Review the AI's suggestions below." });
     } catch (error) {
       console.error("AI Suggestion Error:", error);
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
       toast({ title: "AI Suggestion Failed", description: errorMessage, variant: "destructive" });
-      setAiSuggestedPlanJSON("Error generating JSON suggestions. " + errorMessage);
-      setAiSuggestedPlanTextual("Error generating textual plan. " + errorMessage);
+      setAiSuggestedPlanJSON(`Error: Could not generate valid JSON. ${errorMessage}`);
+      setAiSuggestedPlanTextual(`Error: Could not generate textual plan. ${errorMessage}`);
     } finally {
       setIsSuggesting(false);
     }
   };
 
+  const handleApplyAISuggestions = () => {
+    if (!aiSuggestedPlanJSON) {
+        toast({ title: "Error", description: "No AI suggestions (JSON) available to apply.", variant: "destructive" });
+        return;
+    }
+    setIsApplyingSuggestions(true);
+    try {
+        const suggestedData = JSON.parse(aiSuggestedPlanJSON); 
+
+        const fieldsToUpdate: (keyof PlanFormData)[] = [
+            'name', 'description', 'duration', 'goal', 'targetAudience',
+            'ageMin', 'ageMax', 'price', 'isPublished' 
+        ];
+
+        fieldsToUpdate.forEach(key => {
+            if (suggestedData.hasOwnProperty(key)) {
+                form.setValue(key, suggestedData[key] as any, { shouldValidate: true, shouldDirty: true });
+            }
+        });
+
+        if (suggestedData.hasOwnProperty('imageUrl') && typeof suggestedData.imageUrl === 'string') {
+            setImagePreview(suggestedData.imageUrl);
+            form.setValue('imageUrl', suggestedData.imageUrl, { shouldValidate: true, shouldDirty: true });
+            setPlanImageFile(null);
+            setMarkImageForRemoval(false);
+        }
+        
+        if (suggestedData.hasOwnProperty('bmiCategories') && Array.isArray(suggestedData.bmiCategories)) {
+            const validBmiCategories = suggestedData.bmiCategories.filter((cat: string) => 
+                ACTUAL_PLAN_BMI_CATEGORIES.includes(cat as PlanSpecificBMICategory)
+            );
+            form.setValue('bmiCategories', validBmiCategories as PlanSpecificBMICategory[], { shouldValidate: true, shouldDirty: true });
+        } else if (suggestedData.hasOwnProperty('bmiCategories')) {
+             console.warn("AI suggested 'bmiCategories' but it was not an array:", suggestedData.bmiCategories);
+        }
+
+        if (suggestedData.hasOwnProperty('exercises') && Array.isArray(suggestedData.exercises)) {
+            const formattedExercises = suggestedData.exercises.map((ex: any) => ({
+                name: ex.name || ex.exerciseName || "",
+                dayOfWeek: ex.dayOfWeek || ex.day || "Monday",
+                sets: typeof ex.sets === 'number' ? ex.sets : parseInt(ex.sets) || 3,
+                reps: ex.reps || "",
+                instructions: ex.instructions || "",
+            }));
+            form.setValue('exercises', formattedExercises, { shouldValidate: true, shouldDirty: true });
+        } else if (suggestedData.hasOwnProperty('exercises')) {
+            console.warn("AI suggested 'exercises' but it was not an array:", suggestedData.exercises);
+        }
+
+        toast({ title: "AI Suggestions Applied", description: "The form has been updated. Please review and save." });
+    } catch (error) {
+        console.error("Error applying AI suggestions:", error);
+        toast({ title: "Application Failed", description: "Could not apply AI suggestions. The JSON might be invalid or not match the expected plan structure.", variant: "destructive" });
+    } finally {
+        setIsApplyingSuggestions(false);
+    }
+  };
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      <form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-8">
         <Card className="shadow-xl">
           <CardHeader>
             <CardTitle className="text-2xl">{initialData ? "Edit Fitness Plan" : "Create New Fitness Plan"}</CardTitle>
@@ -167,7 +294,6 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Basic Info Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField control={form.control} name="name" render={({ field }) => (
                 <FormItem>
@@ -195,7 +321,44 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
               </FormItem>
             )} />
             
-            {/* Details Section */}
+            <FormItem>
+                <FormLabel>Plan Image (Optional)</FormLabel>
+                <div className="flex items-center gap-4">
+                    {imagePreview ? (
+                        <div className="relative w-32 h-32 sm:w-40 sm:h-40 rounded-md overflow-hidden border group">
+                        <NextImage src={imagePreview} alt="Plan image preview" fill className="object-cover" />
+                         <Button 
+                            type="button" 
+                            variant="destructive" 
+                            size="icon" 
+                            className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={handleRemoveImage}
+                            aria-label="Remove image"
+                          >
+                            <XCircle className="h-5 w-5"/>
+                        </Button>
+                        </div>
+                    ) : (
+                        <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-md border border-dashed flex flex-col items-center justify-center bg-muted/50 text-muted-foreground">
+                            <UploadCloud className="h-10 w-10 mb-2"/>
+                            <span>No Image</span>
+                        </div>
+                    )}
+                    <div className="flex-grow">
+                        <FormControl>
+                            <Input 
+                                type="file" 
+                                accept="image/png, image/jpeg, image/webp" 
+                                onChange={handleImageFileChange}
+                                className="text-sm file:mr-2 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20"
+                            />
+                        </FormControl>
+                        <FormDescription className="mt-1 text-xs">Max 5MB. PNG, JPG, WEBP accepted. This will replace any existing image.</FormDescription>
+                    </div>
+                </div>
+                 <FormMessage>{form.formState.errors.imageUrl?.message}</FormMessage>
+            </FormItem>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <FormField control={form.control} name="duration" render={({ field }) => (
                 <FormItem>
@@ -223,7 +386,6 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
               )} />
             </div>
 
-            {/* Targeting Section */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-end">
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="ageMin" render={({ field }) => (
@@ -331,7 +493,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                         className="mt-1"
                                     />
                                 </div>
-                                <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()}>
+                                <Button onClick={handleRequestAISuggestions} disabled={isSuggesting || !modificationRequest.trim()} className="w-full sm:w-auto">
                                     {isSuggesting ? "Getting Suggestions..." : <><Wand2 className="mr-2 h-4 w-4" /> Get AI Suggestions</>}
                                 </Button>
                                 {aiSuggestedPlanTextual && (
@@ -359,9 +521,19 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
                                             rows={10}
                                             className="mt-1 font-mono text-xs bg-muted/50"
                                         />
-                                        <Button variant="outline" size="sm" className="mt-1" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanJSON || "")}>
-                                            Copy JSON
-                                        </Button>
+                                        <div className="flex gap-2 mt-1">
+                                            <Button variant="outline" size="sm" onClick={() => navigator.clipboard.writeText(aiSuggestedPlanJSON || "")}>
+                                                Copy JSON
+                                            </Button>
+                                            <Button 
+                                                variant="default" 
+                                                size="sm" 
+                                                onClick={handleApplyAISuggestions}
+                                                disabled={isApplyingSuggestions || !aiSuggestedPlanJSON.startsWith('{') } 
+                                            >
+                                                {isApplyingSuggestions ? "Applying..." : <><DownloadCloud className="mr-2 h-4 w-4"/> Apply to Form</>}
+                                            </Button>
+                                        </div>
                                     </div>
                                 )}
                             </div>
@@ -395,9 +567,9 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit, isSubmitting
          </Card>
 
         <div className="flex justify-end pt-6 border-t">
-            <Button type="submit" disabled={isSubmitting} size="lg" className="w-full sm:w-auto">
+            <Button type="submit" disabled={parentIsSubmitting || localIsSubmitting} size="lg" className="w-full sm:w-auto">
                 <Save className="mr-2 h-5 w-5" />
-                {isSubmitting ? "Saving..." : submitButtonText}
+                {(parentIsSubmitting || localIsSubmitting) ? "Saving..." : submitButtonText}
             </Button>
         </div>
       </form>

@@ -12,7 +12,7 @@ import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
-import { UserPlus } from 'lucide-react';
+import { UserPlus, Eye, EyeOff } from 'lucide-react'; // Import Eye and EyeOff icons
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -20,7 +20,9 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'member' | 'trainer'>('member');
-  const { register, loading } = useAuth(); // Assuming register is added to useAuth
+  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // State for confirm password visibility
+  const { register, loading } = useAuth();
   const router = useRouter();
 
   const handleSubmit = async (e: FormEvent) => {
@@ -43,10 +45,9 @@ export default function RegisterPage() {
     }
 
     try {
-      // Assuming register function takes (name, email, password, role)
       await register(name, email, password, role); 
       toast({ title: "Registration Successful", description: `Welcome to ${APP_NAME}! You can now log in.` });
-      router.push('/login'); // Redirect to login page after successful registration
+      router.push('/login');
     } catch (error: any) {
       const errorMessage = error.message || "Could not register your account. Please try again.";
       toast({ title: "Registration Failed", description: errorMessage, variant: "destructive" });
@@ -92,27 +93,55 @@ export default function RegisterPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="•••••••• (min. 6 characters)"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="text-base"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="•••••••• (min. 6 characters)"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="text-base pr-10" // Add padding for the icon
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-foreground dark:text-white" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-foreground dark:text-white" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                className="text-base"
-              />
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  required
+                  className="text-base pr-10" // Add padding for the icon
+                />
+                 <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 focus:outline-none"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5 text-foreground dark:text-white" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-foreground dark:text-white" />
+                  )}
+                </button>
+              </div>
             </div>
             <div className="space-y-2">
               <Label>Register as:</Label>
@@ -134,7 +163,6 @@ export default function RegisterPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-muted-foreground flex-col space-y-2">
           <p>Already have an account? <Button variant="link" className="p-0 h-auto" asChild><Link href="/login">Log in</Link></Button></p>
-          <p>Connects to Firebase Authentication & Firestore.</p>
         </CardFooter>
       </Card>
     </div>

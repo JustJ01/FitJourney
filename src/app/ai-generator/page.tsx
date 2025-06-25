@@ -39,8 +39,6 @@ export default function AIPlanGeneratorPage() {
 
   const handleRegenerate = () => {
     setGeneratedPlan(null);
-    // Ideally, you might want to re-submit the form with the same data or clear it.
-    // For now, it just clears the plan, user can submit form again.
   }
 
   return (

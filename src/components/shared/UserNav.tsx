@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import { LogIn, LogOut, UserCircle, LayoutDashboard } from 'lucide-react';
+import { LogIn, LogOut, UserCircle, LayoutDashboard, Heart, LineChart } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const UserNav = () => {
@@ -71,6 +71,22 @@ const UserNav = () => {
               <span>Profile</span>
             </Link>
           </DropdownMenuItem>
+          {user.role === 'member' && (
+            <>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/profile/saved-plans">
+                  <Heart className="mr-2 h-4 w-4" />
+                  <span>Saved Plans</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="cursor-pointer">
+                <Link href="/profile/progress">
+                  <LineChart className="mr-2 h-4 w-4" />
+                  <span>My Progress</span>
+                </Link>
+              </DropdownMenuItem>
+            </>
+          )}
           {user.role === 'trainer' && (
             <DropdownMenuItem asChild className="cursor-pointer">
               <Link href="/dashboard">

@@ -39,5 +39,16 @@ export const DAYS_OF_WEEK = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Daily"
 ] as const;
 
-export const DEFAULT_AGE_RANGE: [number, number] = [18, 65];
+export const DEFAULT_AGE_RANGE: [number, number] = [10, 100]; // Updated range
 export const DEFAULT_PRICE_RANGE: [number, number] = [0, 200];
+
+export const WORKOUT_FREQUENCIES = [
+  "As per AI suggestion",
+  "1-2 days a week",
+  "2-3 days a week",
+  "3-4 days a week",
+  "4-5 days a week",
+  "5-6 days a week",
+  "Daily"
+];
+

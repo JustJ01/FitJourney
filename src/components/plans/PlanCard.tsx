@@ -6,27 +6,63 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Star, Tag, Users, CalendarDays, BarChart3 } from 'lucide-react';
 import Image from 'next/image';
+import FavoriteToggleButton from './FavoriteToggleButton'; // Import the new component
 
 interface PlanCardProps {
   plan: Plan;
 }
 
+const renderStars = (rating: number, planId: string, starSizeClass = "h-4 w-4") => {
+  const numStars = 5;
+  const fullStars = Math.floor(rating);
+  const fractionalPart = rating - fullStars;
+  const filledPercentage = fractionalPart > 0 ? fractionalPart * 100 : 0;
+
+  return Array.from({ length: numStars }, (_, i) => {
+    const starValue = i + 1;
+    if (starValue <= fullStars) {
+      return <Star key={`star-full-${planId}-${i}`} className={`${starSizeClass} text-yellow-400 fill-yellow-400`} />;
+    } else if (starValue === fullStars + 1 && fractionalPart > 0) {
+      return (
+        <div key={`star-partial-${planId}-${i}`} className={`relative ${starSizeClass}`}>
+          <Star className={`absolute ${starSizeClass} text-gray-300 dark:text-gray-600`} />
+          <Star
+            className={`absolute ${starSizeClass} text-yellow-400 fill-yellow-400`}
+            style={{ clipPath: `inset(0 ${100 - filledPercentage}% 0 0)` }}
+          />
+        </div>
+      );
+    } else {
+      return <Star key={`star-empty-${planId}-${i}`} className={`${starSizeClass} text-gray-300 dark:text-gray-600`} />;
+    }
+  });
+};
+
 const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
+  const imageSrc = plan.imageUrl || `https://placehold.co/400x200.png?text=${encodeURIComponent(plan.name.substring(0,15))}`;
+  const imageHint = plan.imageUrl ? plan.name : "fitness abstract"; // Use plan name as hint if specific image, otherwise generic
+
   return (
     <Link href={`/plans/${plan.id}`} className="block group">
       <Card className="h-full flex flex-col overflow-hidden shadow-lg hover:shadow-xl transition-shadow duration-300 transform hover:-translate-y-1">
         <div className="relative h-48 w-full">
-          <Image 
-            src={`https://placehold.co/400x200.png?text=${encodeURIComponent(plan.name.substring(0,15))}`} 
-            alt={plan.name} 
-            layout="fill" 
-            objectFit="cover"
-            data-ai-hint="fitness abstract"
+          <Image
+            src={imageSrc}
+            alt={plan.name}
+            fill
+            className="object-cover"
+            data-ai-hint={imageHint}
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" // Basic example, adjust as needed
           />
-           <div className="absolute top-2 right-2">
-            <Badge variant={plan.price === 0 ? "secondary" : "default"}>
+           <div className="absolute top-3 right-3 flex items-center gap-2">
+            <FavoriteToggleButton 
+                planId={plan.id} 
+                size="icon" 
+                className="relative z-10 h-9 w-9 rounded-full bg-black/20 text-white/80 backdrop-blur-sm transition-all hover:bg-black/30 hover:text-white"
+            />
+            <div className="flex items-center justify-center rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg">
                 {plan.price === 0 ? 'Free' : `$${plan.price.toFixed(2)}`}
-            </Badge>
+            </div>
           </div>
         </div>
         <CardHeader>
@@ -46,9 +82,15 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
             <Users className="h-4 w-4 text-primary" />
             <span>For: {plan.targetAudience}</span>
           </div>
-           <div className="flex items-center gap-2 text-yellow-500">
-            <Star className="h-4 w-4 fill-current" />
-            <span>{plan.rating.toFixed(1)} / 5.0</span>
+           <div className="flex items-center gap-0.5">
+            {(plan.numberOfRatings || 0) > 0 ? (
+              <>
+                {renderStars(plan.rating, plan.id)}
+                <span className="text-sm text-foreground/70 ml-1.5">({(plan.rating || 0).toFixed(1)})</span>
+              </>
+            ) : (
+                <span className="text-xs text-muted-foreground italic">Not yet rated</span>
+            )}
           </div>
         </CardContent>
         <CardFooter className="border-t pt-4">

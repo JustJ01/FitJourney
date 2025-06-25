@@ -1,12 +1,51 @@
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_NAME } from "@/lib/constants";
-import { Lightbulb, ListChecks, Zap } from "lucide-react";
+import { Lightbulb, ListChecks, Zap, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
+// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // No longer directly used here
+import { getHighestRatedPlans, getFeaturedReviews } from "@/lib/data";
+import type { Plan, Review } from "@/types";
+import FeaturedReviewCard from "@/components/home/FeaturedReviewCard"; // Import the new component
 
-export default function HomePage() {
+export default async function HomePage() {
+  const featuredPlansPromise = getHighestRatedPlans(3);
+  const featuredReviewsPromise = getFeaturedReviews(2);
+
+  const [featuredPlans, featuredReviews] = await Promise.all([
+    featuredPlansPromise,
+    featuredReviewsPromise,
+  ]);
+
+  const renderStars = (rating: number, planId: string, starSizeClass = "h-4 w-4") => {
+    const numStars = 5;
+    const fullStars = Math.floor(rating);
+    const fractionalPart = rating - fullStars;
+    const filledPercentage = fractionalPart > 0 ? fractionalPart * 100 : 0;
+
+    return Array.from({ length: numStars }, (_, i) => {
+      const starValue = i + 1;
+      if (starValue <= fullStars) {
+        return <Star key={`star-full-${planId}-${i}`} className={`${starSizeClass} text-yellow-400 fill-yellow-400`} />;
+      } else if (starValue === fullStars + 1 && fractionalPart > 0) {
+        return (
+          <div key={`star-partial-${planId}-${i}`} className={`relative ${starSizeClass}`}>
+            <Star className={`absolute ${starSizeClass} text-gray-300 dark:text-gray-600`} />
+            <Star
+              className={`absolute ${starSizeClass} text-yellow-400 fill-yellow-400`}
+              style={{ clipPath: `inset(0 ${100 - filledPercentage}% 0 0)` }}
+            />
+          </div>
+        );
+      } else {
+        return <Star key={`star-empty-${planId}-${i}`} className={`${starSizeClass} text-gray-300 dark:text-gray-600`} />;
+      }
+    });
+  };
+
+
   return (
     <div className="flex flex-col items-center text-center space-y-12">
       <section className="w-full py-12 md:py-24 lg:py-32">
@@ -31,9 +70,9 @@ export default function HomePage() {
               </div>
             </div>
             <Image
-              src="https://placehold.co/600x400.png"
+              src="https://res.cloudinary.com/dtls6wwkz/image/upload/v1750886243/fitnesslogo_b67tzc.jpg"
               alt="Fitness illustration"
-              data-ai-hint="fitness workout"
+              data-ai-hint="group fitness class"
               width={600}
               height={400}
               className="mx-auto aspect-video overflow-hidden rounded-xl object-cover sm:w-full lg:order-last lg:aspect-square shadow-lg"
@@ -96,6 +135,77 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* Featured Fitness Plans Section - Now Dynamic */}
+      <section className="w-full py-12 md:py-24 lg:py-32">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+            <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm text-secondary-foreground">Discover</div>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">Top Rated Fitness Plans</h2>
+            <p className="max-w-[900px] text-foreground/70 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+              Get started with some of our most popular and effective fitness plans, highly rated by our community.
+            </p>
+          </div>
+          {featuredPlans.length > 0 ? (
+            <div className="mx-auto grid max-w-5xl items-stretch gap-8 sm:grid-cols-2 md:gap-12 lg:grid-cols-3">
+              {featuredPlans.map((plan) => (
+                <Card key={plan.id} className="shadow-md hover:shadow-xl transition-shadow duration-300 flex flex-col">
+                  <CardHeader className="p-0">
+                    <Image
+                      src={plan.imageUrl || "https://placehold.co/400x225.png"}
+                      alt={plan.name}
+                      data-ai-hint={plan.imageUrl ? plan.name : `${plan.goal.toLowerCase()} workout`}
+                      width={400}
+                      height={225}
+                      className="rounded-t-lg object-cover aspect-[16/9]"
+                    />
+                  </CardHeader>
+                  <CardContent className="p-6 flex-grow text-left">
+                    <CardTitle className="mb-2 text-xl">{plan.name}</CardTitle>
+                    <div className="flex items-center gap-0.5 mb-2">
+                      {renderStars(plan.rating || 0, plan.id)}
+                      {(plan.numberOfRatings || 0) > 0 && (
+                        <span className="text-sm text-foreground/70 ml-1.5">({(plan.rating || 0).toFixed(1)})</span>
+                      )}
+                    </div>
+                    <CardDescription className="text-sm line-clamp-3">{plan.description}</CardDescription>
+                  </CardContent>
+                  <CardFooter className="p-6 pt-0">
+                    <Button asChild className="w-full" variant="outline">
+                      <Link href={`/plans/${plan.id}`}>View Plan</Link>
+                    </Button>
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground">No featured plans available at the moment. Check back soon!</p>
+          )}
+        </div>
+      </section>
+
+      {/* Testimonials Section - Now Dynamic */}
+      <section className="w-full py-12 md:py-24 lg:py-32 bg-muted/50">
+        <div className="container px-4 md:px-6">
+          <div className="flex flex-col items-center justify-center space-y-4 text-center mb-12">
+            <div className="inline-block rounded-lg bg-secondary px-3 py-1 text-sm text-secondary-foreground">Success Stories</div>
+            <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">What Our Users Say</h2>
+            <p className="max-w-[900px] text-foreground/70 md:text-xl/relaxed lg:text-base/relaxed xl:text-xl/relaxed">
+              Hear from individuals who have transformed their fitness with {APP_NAME}.
+            </p>
+          </div>
+          {featuredReviews.length > 0 ? (
+            <div className="mx-auto grid max-w-4xl items-start gap-8 sm:grid-cols-1 md:gap-12 lg:grid-cols-2">
+              {featuredReviews.map((review) => (
+                <FeaturedReviewCard key={`${review.planId}-${review.id}`} review={review} />
+              ))}
+            </div>
+          ) : (
+            <p className="text-center text-muted-foreground">No featured reviews available yet. Be the first to review a plan!</p>
+          )}
+        </div>
+      </section>
+
     </div>
   );
 }

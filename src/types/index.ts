@@ -7,35 +7,40 @@ export interface User {
   name: string;
   email: string;
   role: 'member' | 'trainer';
+  avatarUrl?: string; // Will now store Cloudinary URL
+  age?: number;
+  weight?: number; // in kg
+  height?: number; // in cm
+  gender?: 'male' | 'female' | 'other';
 }
 
 export interface Trainer extends User {
   role: 'trainer';
   bio?: string;
   specializations?: string[];
-  avatarUrl?: string;
 }
 
-// Data for updating a member's profile
 export interface UserProfileUpdateData {
   name?: string;
+  avatarUrl?: string; // This will be the Cloudinary URL string or "" for removal
+  age?: number;
+  weight?: number;
+  height?: number;
+  gender?: 'male' | 'female' | 'other';
 }
 
-// Data for updating a trainer's profile
-export interface TrainerProfileUpdateData {
-  name?: string;
+export interface TrainerProfileUpdateData extends UserProfileUpdateData {
   bio?: string;
-  specializations?: string[]; // Stored as an array, but might be edited as comma-separated string in UI
-  avatarUrl?: string;
+  specializations?: string[];
 }
 
 
 export interface Exercise {
   id: string;
   name: string;
-  dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday' | 'Daily' | string; // string for AI flexibility
+  dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday' | 'Daily' | string;
   sets: number;
-  reps: string; // Can be "10-12" or "To failure"
+  reps: string;
   instructions?: string;
   planId: string;
 }
@@ -47,39 +52,85 @@ export interface Plan {
   id: string;
   name: string;
   description: string;
-  duration: string; // e.g., "4 weeks", "3 months"
-  goal: string; // e.g., "Weight Loss", "Muscle Gain"
-  rating: number; // 1-5
-  price: number; // 0 for free plans
-  targetAudience: string; // e.g., "Beginners", "Advanced Athletes"
+  duration: string;
+  goal: string;
+  rating: number;
+  numberOfRatings?: number;
+  price: number;
+  targetAudience: string;
   trainerId: string;
   trainerName?: string;
-  trainerAvatarUrl?: string;
+  trainerAvatarUrl?: string; // Will now store Cloudinary URL
   ageMin: number;
   ageMax: number;
   bmiCategories: PlanSpecificBMICategory[];
-  createdAt: string; // ISO date string
-  updatedAt: string; // ISO date string
+  createdAt: string;
+  updatedAt: string;
   exercises?: Exercise[];
   isPublished?: boolean;
+  imageUrl?: string; // Will now store Cloudinary URL
 }
 
-// For AI Plan Generation form input
 export interface AIPlanRequest {
   age: number;
   fitnessGoal: string;
   bmi: number;
   experienceLevel: 'beginner' | 'intermediate' | 'advanced';
+  availableEquipment?: string;
+  workoutFrequency?: string;
+  muscleFocus?: string;
 }
 
-// Simplified AI Plan structure matching Genkit output for internal use after generation
 export type AIGeneratedPlan = GeneratePersonalizedPlanOutput['plan'];
 
 export interface PlanFilters {
   ageRange: [number, number];
-  bmiCategory: BMICategory | ''; // Can be 'All' or specific, or '' for reset state
+  bmiCategory: BMICategory | '';
   rating: number | null;
   price: [number, number];
-  duration: string; // e.g. "1-4 weeks", "1-3 months", "3+ months", or "" for any
+  duration: string;
   searchTerm: string;
+}
+
+export interface PlanRating { 
+  userId: string;
+  planId: string;
+  ratingValue: number; 
+  ratedAt: string; 
+}
+
+export interface Review { 
+  id: string; 
+  planId: string;
+  userId: string;
+  userName: string;
+  userAvatarUrl?: string; 
+  rating: number; 
+  comment: string;
+  createdAt: string; 
+  updatedAt?: string; 
+}
+
+export interface ProgressEntry {
+  id: string;
+  userId: string;
+  planId: string;
+  exerciseId: string;
+  exerciseName: string;
+  date: string; // ISO string
+  weight?: number;
+  reps?: number;
+  sets?: number;
+  duration?: number; // in minutes for cardio/timed exercises
+  notes?: string;
+  caloriesBurned?: number;
+}
+
+export interface UserPlanStatus {
+  id: string; // planId
+  userId: string;
+  planId: string;
+  completedDays: number[];
+  startDate: string; // ISO String
+  lastUpdated: string; // ISO string
 }

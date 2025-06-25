@@ -12,11 +12,13 @@ import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react'; // Import Eye and EyeOff icons
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'member' | 'trainer'>('member');
+  const [showPassword, setShowPassword] = useState(false); // State for password visibility
   const { login, loading } = useAuth();
   const router = useRouter();
 
@@ -70,15 +72,29 @@ export default function LoginPage() {
                   <Link href="/forgot-password">Forgot Password?</Link>
                 </Button>
               </div>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="text-base"
-              />
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="text-base pr-10" // Add padding for the icon
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-3 focus:outline-none"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-foreground dark:text-white" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-foreground dark:text-white" />
+                  )}
+                </button>
+              </div>
             </div>
             
             <div className="space-y-2">
@@ -93,7 +109,6 @@ export default function LoginPage() {
                   <Label htmlFor="role-trainer">Trainer</Label>
                 </div>
               </RadioGroup>
-               <p className="text-xs text-muted-foreground">Ensure user exists in Firebase Auth & Firestore with this role.</p>
             </div>
 
             <Button type="submit" className="w-full text-lg py-6" disabled={loading}>
@@ -103,7 +118,6 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="text-center text-sm text-muted-foreground flex-col space-y-2">
            <p>Don't have an account? <Button variant="link" className="p-0 h-auto" asChild><Link href="/register">Sign up</Link></Button></p>
-          <p>Connects to Firebase Authentication & Firestore.</p>
         </CardFooter>
       </Card>
     </div>

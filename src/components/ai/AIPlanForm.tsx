@@ -8,16 +8,20 @@ import type { AIPlanRequest } from '@/types';
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Lightbulb, Sparkles } from "lucide-react";
-import { FITNESS_GOALS, EXPERIENCE_LEVELS } from "@/lib/constants";
+import { FITNESS_GOALS, EXPERIENCE_LEVELS, WORKOUT_FREQUENCIES } from "@/lib/constants";
 
 const formSchema = z.object({
   age: z.coerce.number().min(10, "Age must be at least 10.").max(100, "Age must be at most 100."),
   fitnessGoal: z.string().min(1, "Fitness goal is required."),
   bmi: z.coerce.number().min(10, "BMI must be at least 10.").max(50, "BMI must be at most 50."),
   experienceLevel: z.enum(["beginner", "intermediate", "advanced"]),
+  availableEquipment: z.string().optional(),
+  workoutFrequency: z.string().optional(),
+  muscleFocus: z.string().optional(),
 });
 
 interface AIPlanFormProps {
@@ -33,6 +37,9 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
       fitnessGoal: FITNESS_GOALS[0],
       bmi: 22,
       experienceLevel: "beginner",
+      availableEquipment: "",
+      workoutFrequency: WORKOUT_FREQUENCIES[0], // Default to "As per AI suggestion"
+      muscleFocus: "",
     },
   });
 
@@ -119,6 +126,56 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
                 </FormItem>
               )}
             />
+             <FormField
+              control={form.control}
+              name="availableEquipment"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Available Equipment (Optional)</FormLabel>
+                  <FormControl>
+                    <Textarea placeholder="e.g., Dumbbells, resistance bands, full gym access, bodyweight only" {...field} rows={2} />
+                  </FormControl>
+                  <FormDescription>Let the AI know what you have access to.</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="workoutFrequency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preferred Workout Frequency (Optional)</FormLabel>
+                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="How often do you want to work out?" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {WORKOUT_FREQUENCIES.map(freq => (
+                        <SelectItem key={freq} value={freq}>{freq}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="muscleFocus"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Specific Muscle Focus (Optional)</FormLabel>
+                  <FormControl>
+                    <Input placeholder="e.g., Upper body, legs, core, glutes" {...field} />
+                  </FormControl>
+                  <FormDescription>Any particular areas you want to target?</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
             <Button type="submit" className="w-full text-lg py-6" disabled={isLoading}>
               {isLoading ? "Generating Plan..." : (
                 <>
@@ -135,3 +192,4 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
 };
 
 export default AIPlanForm;
+

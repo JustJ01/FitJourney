@@ -5,35 +5,35 @@ import type { AIGeneratedPlan } from '@/types';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { CalendarDays, Dumbbell, Layers, Repeat, Save, Sparkles, Target } from 'lucide-react';
+import { CalendarDays, Dumbbell, Layers, Repeat, Save, Sparkles, Target, Info } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { saveAIPlanAsNew } from '@/lib/data';
 import { toast } from '@/hooks/use-toast';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
-
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 interface GeneratedPlanViewProps {
   plan: AIGeneratedPlan | null;
-  onRegenerate?: () => void; // Optional: if regeneration is needed
+  onRegenerate?: () => void;
 }
 
 const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerate }) => {
   const { user } = useAuth();
+  const router = useRouter(); // Initialize useRouter
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  const [planName, setPlanName] = useState(plan?.goal ? `AI: ${plan.goal}` : "AI Generated Plan");
-  const [planDescription, setPlanDescription] = useState(plan?.goal ? `An AI generated plan focusing on ${plan.goal}. Duration: ${plan?.duration}.` : "Customizable AI generated plan.");
+  const [planName, setPlanName] = useState("");
+  const [planDescription, setPlanDescription] = useState("");
 
-  // Update default name/description if plan prop changes (e.g., after regeneration)
-  useState(() => {
+  useEffect(() => {
     if (plan) {
         setPlanName(plan.goal ? `AI: ${plan.goal}` : "AI Generated Plan");
         setPlanDescription(plan.goal ? `An AI generated plan focusing on ${plan.goal}. Duration: ${plan?.duration}.` : "Customizable AI generated plan.");
     }
-  });
+  }, [plan]);
 
 
   if (!plan) {
@@ -54,7 +54,7 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
       toast({
         title: "Plan Saved!",
         description: `${savedPlan.name} has been added to your drafts in the dashboard.`,
-        action: <Button variant="outline" size="sm" onClick={() => window.location.href = `/dashboard/plans/${savedPlan.id}/edit`}>Edit Plan</Button>
+        action: <Button variant="outline" size="sm" onClick={() => router.push(`/dashboard/plans/${savedPlan.id}/edit`)}>Edit Plan</Button>
       });
       setShowSaveDialog(false);
     } catch (error) {
@@ -65,9 +65,8 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
     }
   };
 
-  // Group exercises by day
   const exercisesByDay: Record<string, AIGeneratedPlan['exercises']> = plan.exercises.reduce((acc, ex) => {
-    const day = ex.day || 'Unassigned'; // Handle cases where day might be missing
+    const day = ex.day || 'Unassigned';
     if (!acc[day]) {
       acc[day] = [];
     }
@@ -123,6 +122,12 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
                             <Repeat className="h-4 w-4 text-accent" /> Reps: {exercise.reps}
                         </span>
                       </div>
+                      {exercise.instructions && (
+                        <p className="mt-2 text-xs text-foreground/80 italic flex items-start gap-1.5">
+                          <Info className="h-3.5 w-3.5 text-accent shrink-0 mt-0.5" />
+                          <span>{exercise.instructions}</span>
+                        </p>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -155,11 +160,11 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
                 </DialogHeader>
                 <div className="space-y-4 py-4">
                   <div>
-                    <label htmlFor="planName" className="block text-sm font-medium text-gray-700">Plan Name</label>
+                    <label htmlFor="planName" className="block text-sm font-medium text-foreground">Plan Name</label>
                     <Input id="planName" value={planName} onChange={(e) => setPlanName(e.target.value)} className="mt-1"/>
                   </div>
                   <div>
-                    <label htmlFor="planDescription" className="block text-sm font-medium text-gray-700">Plan Description</label>
+                    <label htmlFor="planDescription" className="block text-sm font-medium text-foreground">Plan Description</label>
                     <Textarea id="planDescription" value={planDescription} onChange={(e) => setPlanDescription(e.target.value)} className="mt-1" rows={3}/>
                   </div>
                 </div>
@@ -179,4 +184,3 @@ const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerat
 };
 
 export default GeneratedPlanView;
-
