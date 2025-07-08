@@ -135,26 +135,32 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
   }, [id, user, fetchAllUserData, refreshDataKey]);
 
   const handlePurchase = async () => {
-    if (!user || !plan) return;
+    if (!user || !plan) {
+      toast({ title: "Error", description: "User or plan details are missing.", variant: "destructive" });
+      return;
+    }
     if (user.role !== 'member') {
-      toast({
-        title: "Action Not Allowed",
-        description: "Only members can purchase plans.",
-        variant: "destructive"
-      });
+      toast({ title: "Action Not Allowed", description: "Only members can purchase plans.", variant: "destructive" });
       return;
     }
     if (!razorpayScriptLoaded.current) {
-        toast({ title: "Payment Gateway Loading", description: "Please wait a moment for the payment gateway to load and try again.", variant: "default" });
-        return;
+      toast({ title: "Payment Gateway Loading", description: "Please wait a moment for the payment gateway to load and try again.", variant: "default" });
+      return;
     }
+
     setIsProcessingPayment(true);
+
+    const currentUserId = user.id;
+    const currentPlanId = plan.id;
+    const currentPlanName = plan.name;
+    const currentUserEmail = user.email!;
+    const currentUserName = user.name!;
 
     try {
       const orderResponse = await fetch('/api/create-razorpay-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: plan.id }),
+        body: JSON.stringify({ planId: currentPlanId }),
       });
 
       if (!orderResponse.ok) {
@@ -164,92 +170,78 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
       const order = await orderResponse.json();
 
       const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
-          amount: order.amount,
-          currency: order.currency,
-          name: APP_NAME,
-          description: `Purchase of ${plan.name}`,
-          order_id: order.id,
-          handler: async function (response: any) {
-              console.log("Razorpay success response received:", response);
-
-              const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = response || {};
-              const { id: userId } = user || {};
-              const { id: planId } = plan || {};
-
-              // More robust check: if ANY of the required fields are missing, fail immediately.
-              if (razorpay_payment_id && razorpay_order_id && razorpay_signature && userId && planId) {
-                  // ALL GOOD - PROCEED WITH VERIFICATION
-                  try {
-                      const verificationResponse = await fetch('/api/verify-razorpay-payment', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                              razorpay_payment_id,
-                              razorpay_order_id,
-                              razorpay_signature,
-                              userId,
-                              planId,
-                          }),
-                      });
-
-                      const verificationResult = await verificationResponse.json();
-                      if (!verificationResponse.ok || !verificationResult.success) {
-                          throw new Error(verificationResult.error || "Payment verification failed.");
-                      }
-                      
-                      toast({
-                        title: "Payment Successful!",
-                        description: "You now have full access to this plan.",
-                      });
-                      setHasPurchased(true); 
-                  } catch (verificationError: any) {
-                      console.error("Verification API call failed:", verificationError);
-                      toast({
-                          title: "Verification Failed",
-                          description: verificationError.message || "Could not verify your payment with the server.",
-                          variant: "destructive",
-                      });
-                  } finally {
-                      setIsProcessingPayment(false);
-                  }
-              } else {
-                  // NOT ALL DATA PRESENT - SHOW ERROR AND STOP
-                  const missingFields = [];
-                  if (!razorpay_payment_id) missingFields.push("Payment ID");
-                  if (!razorpay_order_id) missingFields.push("Order ID");
-                  if (!razorpay_signature) missingFields.push("Signature");
-                  if (!userId) missingFields.push("User ID");
-                  if (!planId) missingFields.push("Plan ID");
-                  
-                  const errorMessage = `Missing required payment verification fields: ${missingFields.join(', ')}`;
-                  console.error("Payment verification failed on client. Missing fields:", errorMessage, { response });
-
-                  toast({
-                      title: "Purchase Error",
-                      description: errorMessage,
-                      variant: "destructive",
-                  });
-                  setIsProcessingPayment(false);
-              }
-          },
-          prefill: {
-              name: user.name,
-              email: user.email,
-          },
-          theme: {
-              color: "#16A34A" // Green theme for Razorpay modal
-          },
-          modal: {
-              ondismiss: function() {
-                  setIsProcessingPayment(false);
-              }
+        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+        amount: order.amount,
+        currency: order.currency,
+        name: APP_NAME,
+        description: `Purchase of ${currentPlanName}`,
+        order_id: order.id,
+        handler: async function (response: any) {
+          const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = response;
+          
+          if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
+            console.error("Razorpay response missing required fields:", response);
+            toast({
+                title: "Payment Error",
+                description: "Payment response from the gateway was incomplete. Please try again.",
+                variant: "destructive",
+            });
+            setIsProcessingPayment(false);
+            return;
           }
+          
+          try {
+            const verificationResponse = await fetch('/api/verify-razorpay-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    razorpay_payment_id,
+                    razorpay_order_id,
+                    razorpay_signature,
+                    userId: currentUserId,
+                    planId: currentPlanId,
+                }),
+            });
+
+            const verificationResult = await verificationResponse.json();
+            if (!verificationResponse.ok || !verificationResult.success) {
+                throw new Error(verificationResult.error || "Payment verification failed on the server.");
+            }
+            
+            toast({
+              title: "Payment Successful!",
+              description: "You now have full access to this plan.",
+            });
+            setHasPurchased(true); // Update UI
+          } catch (verificationError: any) {
+            console.error("Payment verification failed:", verificationError);
+            toast({
+                title: "Payment Verification Failed",
+                description: verificationError.message || "Could not verify your payment. Please contact support.",
+                variant: "destructive",
+            });
+          } finally {
+            setIsProcessingPayment(false);
+          }
+        },
+        prefill: {
+            name: currentUserName,
+            email: currentUserEmail,
+        },
+        theme: {
+            color: "#16A34A" // Green theme for Razorpay modal
+        },
+        modal: {
+            ondismiss: function() {
+                console.log("Razorpay checkout modal dismissed.");
+                setIsProcessingPayment(false);
+            }
+        }
       };
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any){
-            console.error("Razorpay payment.failed event:", response);
+            console.error("Razorpay payment failed event:", response.error);
             toast({
                 title: "Payment Failed",
                 description: response.error?.description || "The payment could not be completed.",
@@ -260,6 +252,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
       rzp.open();
 
     } catch (error: any) {
+      console.error("Error setting up purchase:", error);
       toast({
         title: "Purchase Error",
         description: error.message,

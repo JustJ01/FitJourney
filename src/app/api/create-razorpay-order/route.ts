@@ -1,64 +1,48 @@
 
 import { NextResponse } from 'next/server';
-import crypto from 'crypto';
-import { grantPlanAccess, getPlanById } from '@/lib/data';
+import { razorpayInstance } from '@/lib/razorpay';
+import { getPlanById } from '@/lib/data';
+import { v4 as uuidv4 } from 'uuid';
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    console.log("Received payment verification request with body:", JSON.stringify(body, null, 2));
+    const { planId } = await request.json();
 
-    const { 
-        razorpay_order_id, 
-        razorpay_payment_id, 
-        razorpay_signature,
-        userId,
-        planId 
-    } = body;
-
-    const missingFields = [];
-    if (!razorpay_order_id) missingFields.push("razorpay_order_id");
-    if (!razorpay_payment_id) missingFields.push("razorpay_payment_id");
-    if (!razorpay_signature) missingFields.push("razorpay_signature");
-    if (!userId) missingFields.push("userId");
-    if (!planId) missingFields.push("planId");
-
-    if (missingFields.length > 0) {
-        const error = `Missing required payment verification fields: ${missingFields.join(', ')}`;
-        console.error(error, { receivedBody: body });
-        return NextResponse.json({ error }, { status: 400 });
+    if (!planId) {
+      console.error('[API/create-razorpay-order] Error: Plan ID is required.');
+      return NextResponse.json({ error: 'Plan ID is required.' }, { status: 400 });
     }
     
-    if(!process.env.RAZORPAY_KEY_SECRET) {
-        throw new Error('Razorpay key secret is not set in environment variables.');
+    console.log(`[API/create-razorpay-order] Creating order for planId: ${planId}`);
+    const plan = await getPlanById(planId);
+
+    if (!plan || plan.price <= 0) {
+      console.error(`[API/create-razorpay-order] Error: Plan with ID ${planId} is not purchasable or does not exist.`);
+      return NextResponse.json({ error: 'Plan is not purchasable or does not exist.' }, { status: 400 });
     }
 
-    const hmacBody = razorpay_order_id + "|" + razorpay_payment_id;
+    const amountInPaise = Math.round(plan.price * 100);
 
-    const expectedSignature = crypto
-        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-        .update(hmacBody.toString())
-        .digest('hex');
-
-    const isAuthentic = expectedSignature === razorpay_signature;
-
-    if (isAuthentic) {
-      // Fetch plan details to get trainerId and price for the sales record
-      const plan = await getPlanById(planId);
-      if (!plan) {
-          return NextResponse.json({ error: 'Plan not found for purchase record.' }, { status: 404 });
-      }
-
-      // Signature is authentic, grant access to the plan and record the sale
-      await grantPlanAccess(userId, plan, razorpay_payment_id);
-
-      return NextResponse.json({ success: true, message: "Payment verified successfully." });
-    } else {
-      return NextResponse.json({ success: false, error: 'Invalid signature.' }, { status: 400 });
+    if (amountInPaise < 100) { // Razorpay minimum is 1 INR (100 paise)
+      console.error(`[API/create-razorpay-order] Error: The price must be at least ₹1.00. Current amount: ${amountInPaise} paise.`);
+      return NextResponse.json({ error: 'The price must be at least ₹1.00 to be processed.' }, { status: 400 });
     }
+
+    const options = {
+        amount: amountInPaise,
+        currency: "INR",
+        receipt: `rcpt_${uuidv4().replace(/-/g, "").substring(0, 20)}`
+    };
+
+    console.log('[API/create-razorpay-order] Creating Razorpay order with options:', options);
+    const order = await razorpayInstance.orders.create(options);
+    console.log('[API/create-razorpay-order] Razorpay order created successfully:', order);
+    
+    return NextResponse.json(order);
 
   } catch (error: any) {
-    console.error('Error verifying Razorpay payment:', error);
-    return NextResponse.json({ error: error.message || 'Payment verification failed.' }, { status: 500 });
+    console.error('Error creating Razorpay order. Full error object:', JSON.stringify(error, null, 2));
+    const errorMessage = error?.error?.description || error.message || 'Failed to create Razorpay order.';
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
