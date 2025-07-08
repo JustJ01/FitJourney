@@ -1,7 +1,7 @@
 
-"use client";
+"use client"; // Required for useState and useEffect
 
-import { use, useEffect, useState, useCallback, useRef } from 'react'; 
+import { use, useEffect, useState, useCallback, useRef } from 'react'; // Import 'use', 'useCallback' and 'useRef' from React
 import { getPlanById, getTrainerById, getReviewsByPlanId, getUserPlanStatus, getPlanProgressForUser, hasUserPurchasedPlan } from '@/lib/data';
 import type { Plan, Trainer, Review, UserPlanStatus, ProgressEntry } from '@/types';
 import Image from 'next/image';
@@ -15,7 +15,7 @@ import Link from 'next/link';
 import FavoriteToggleButton from '@/components/plans/FavoriteToggleButton';
 import PlanReviewsSection from '@/components/plans/PlanReviewsSection';
 import CurrentUserRatingDisplay from '@/components/plans/CurrentUserRatingDisplay';
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { Skeleton } from '@/components/ui/skeleton'; // For loading state
 import { useAuth } from '@/hooks/useAuth';
 import PlanProgressTracker from '@/components/plans/PlanProgressTracker';
 import PlanHistoryLog from '@/components/plans/PlanHistoryLog';
@@ -136,6 +136,14 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
 
   const handlePurchase = async () => {
     if (!user || !plan) return;
+    if (user.role !== 'member') {
+      toast({
+        title: "Action Not Allowed",
+        description: "Only members can purchase plans.",
+        variant: "destructive"
+      });
+      return;
+    }
     if (!razorpayScriptLoaded.current) {
         toast({ title: "Payment Gateway Loading", description: "Please wait a moment for the payment gateway to load and try again.", variant: "default" });
         return;
@@ -163,36 +171,74 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
           description: `Purchase of ${plan.name}`,
           order_id: order.id,
           handler: async function (response: any) {
-              const verificationResponse = await fetch('/api/verify-razorpay-payment', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                      razorpay_payment_id: response.razorpay_payment_id,
-                      razorpay_order_id: response.razorpay_order_id,
-                      razorpay_signature: response.razorpay_signature,
-                      userId: user.id,
-                      planId: plan.id,
-                  }),
-              });
+              console.log("Razorpay success response received:", response);
 
-              const verificationResult = await verificationResponse.json();
-              if (!verificationResponse.ok || !verificationResult.success) {
-                  throw new Error(verificationResult.error || "Payment verification failed.");
+              const { razorpay_payment_id, razorpay_order_id, razorpay_signature } = response || {};
+              const { id: userId } = user || {};
+              const { id: planId } = plan || {};
+
+              // More robust check: if ANY of the required fields are missing, fail immediately.
+              if (razorpay_payment_id && razorpay_order_id && razorpay_signature && userId && planId) {
+                  // ALL GOOD - PROCEED WITH VERIFICATION
+                  try {
+                      const verificationResponse = await fetch('/api/verify-razorpay-payment', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                              razorpay_payment_id,
+                              razorpay_order_id,
+                              razorpay_signature,
+                              userId,
+                              planId,
+                          }),
+                      });
+
+                      const verificationResult = await verificationResponse.json();
+                      if (!verificationResponse.ok || !verificationResult.success) {
+                          throw new Error(verificationResult.error || "Payment verification failed.");
+                      }
+                      
+                      toast({
+                        title: "Payment Successful!",
+                        description: "You now have full access to this plan.",
+                      });
+                      setHasPurchased(true); 
+                  } catch (verificationError: any) {
+                      console.error("Verification API call failed:", verificationError);
+                      toast({
+                          title: "Verification Failed",
+                          description: verificationError.message || "Could not verify your payment with the server.",
+                          variant: "destructive",
+                      });
+                  } finally {
+                      setIsProcessingPayment(false);
+                  }
+              } else {
+                  // NOT ALL DATA PRESENT - SHOW ERROR AND STOP
+                  const missingFields = [];
+                  if (!razorpay_payment_id) missingFields.push("Payment ID");
+                  if (!razorpay_order_id) missingFields.push("Order ID");
+                  if (!razorpay_signature) missingFields.push("Signature");
+                  if (!userId) missingFields.push("User ID");
+                  if (!planId) missingFields.push("Plan ID");
+                  
+                  const errorMessage = `Missing required payment verification fields: ${missingFields.join(', ')}`;
+                  console.error("Payment verification failed on client. Missing fields:", errorMessage, { response });
+
+                  toast({
+                      title: "Purchase Error",
+                      description: errorMessage,
+                      variant: "destructive",
+                  });
+                  setIsProcessingPayment(false);
               }
-              
-              toast({
-                title: "Payment Successful!",
-                description: "You now have full access to this plan.",
-              });
-              setHasPurchased(true); 
-              setIsProcessingPayment(false);
           },
           prefill: {
               name: user.name,
               email: user.email,
           },
           theme: {
-              color: "#16A34A" 
+              color: "#16A34A" // Green theme for Razorpay modal
           },
           modal: {
               ondismiss: function() {
@@ -203,10 +249,10 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
 
       const rzp = new (window as any).Razorpay(options);
       rzp.on('payment.failed', function (response: any){
-            console.error(response.error);
+            console.error("Razorpay payment.failed event:", response);
             toast({
                 title: "Payment Failed",
-                description: response.error.description || "Something went wrong.",
+                description: response.error?.description || "The payment could not be completed.",
                 variant: "destructive"
             });
             setIsProcessingPayment(false);
@@ -315,7 +361,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
   const planImageSrc = plan.imageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(plan.name)}`;
   const planImageHint = plan.imageUrl ? plan.name : "fitness banner";
   const isPlanFree = plan.price === 0;
-  const canAccessContent = isPlanFree || hasPurchased;
+  const canAccessContent = isPlanFree || hasPurchased || user?.role === 'trainer';
 
   return (
     <div className="space-y-8">
@@ -419,9 +465,13 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
                         <CardDescription>Purchase this plan to view the detailed workout schedule and track your progress.</CardDescription>
                     </CardHeader>
                     <CardFooter>
-                        <Button onClick={handlePurchase} disabled={isProcessingPayment || !user} size="lg" className="w-full">
+                        <Button onClick={handlePurchase} disabled={isProcessingPayment || !user || user.role !== 'member'} size="lg" className="w-full">
                             <ShoppingCart className="mr-2 h-5 w-5" />
-                            {isProcessingPayment ? 'Processing...' : (user ? `Purchase for ₹${plan.price.toFixed(2)}` : "Login to Purchase")}
+                            {isProcessingPayment 
+                                ? 'Processing...' 
+                                : (user?.role === 'trainer' 
+                                    ? 'Trainers Cannot Purchase Plans' 
+                                    : (user ? `Purchase for ₹${plan.price.toFixed(2)}` : "Login to Purchase"))}
                         </Button>
                     </CardFooter>
                 </Card>

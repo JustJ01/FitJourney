@@ -1,9 +1,12 @@
-import type { User, Trainer, Plan, Exercise, AIGeneratedPlan, UserProfileUpdateData, TrainerProfileUpdateData, PlanSpecificBMICategory, PlanRating, Review, ProgressEntry, UserPlanStatus, ChatRoom, ChatMessage, PurchasedPlan } from '@/types';
-import { db } from './firebase'; 
+
+
+import type { User, Trainer, Plan, Exercise, AIGeneratedPlan, UserProfileUpdateData, TrainerProfileUpdateData, PlanSpecificBMICategory, PlanRating, Review, ProgressEntry, UserPlanStatus, ChatRoom, ChatMessage, PurchasedPlan, Sale } from '@/types';
+import { db } from './firebase'; // Removed storage import
 import { collection, query, where, getDocs, doc, getDoc, Timestamp, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, setDoc, documentId, FieldPath, runTransaction, orderBy, limit as firestoreLimit, collectionGroup, arrayUnion, deleteField } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { ACTUAL_PLAN_BMI_CATEGORIES } from './constants';
 
+// Get all published plans with their exercises
 export const getPublishedPlans = async (): Promise<Plan[]> => {
   try {
     const plansCollectionRef = collection(db, 'plans');
@@ -263,7 +266,7 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
               id: userDocSnap.id,
               name: data.name || '',
               email: data.email || '',
-              role: 'member', 
+              role: 'member', // Assuming this function only fetches members, or role is stored
               avatarUrl: data.avatarUrl || '',
               age: data.age,
               weight: data.weight,
@@ -274,7 +277,7 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
       }
       // If not found in 'users', check 'trainers' as a user could be a trainer
       const trainerProfile = await getTrainerById(id);
-      if (trainerProfile) return trainerProfile as User;
+      if (trainerProfile) return trainerProfile as User; // Cast as User for consistent return type if used generically
 
       return undefined;
     } catch (error: any) {
@@ -305,7 +308,7 @@ export const createPlan = async (
     trainerAvatarUrl: trainerAvatarUrlResolved || '',
     rating: 0,
     numberOfRatings: 0,
-    imageUrl: planData.imageUrl || "", 
+    imageUrl: planData.imageUrl || "", // Will come from PlanForm after Cloudinary upload
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isPublished: planData.isPublished === undefined ? false : planData.isPublished,
@@ -347,13 +350,16 @@ export const updatePlan = async (
       planUpdateData.trainerName = trainerDetails?.name || planData.trainerName || 'Unknown Trainer';
       planUpdateData.trainerAvatarUrl = trainerDetails?.avatarUrl || planData.trainerAvatarUrl || '';
   }
-
+  
+  // If imageUrl is explicitly set to "" in planData, it means remove.
+  // If imageUrl is a new URL, it means update.
+  // If imageUrl is undefined in planData, it means no change intended from form for this field.
   if (planData.imageUrl !== undefined) {
     planUpdateData.imageUrl = planData.imageUrl;
   }
 
 
-  await updateDoc(planDocRef, planUpdateData as any);
+  await updateDoc(planDocRef, planUpdateData as any); // Cast as any because serverTimestamp type clashes
 
   const exercisesCollectionRef = collection(db, 'plans', planId, 'exercises');
   const existingExercisesSnapshot = await getDocs(exercisesCollectionRef);
@@ -382,6 +388,9 @@ export const deletePlan = async (planId: string): Promise<boolean> => {
   const reviewsCollectionRef = collection(db, 'plans', planId, 'reviews');
 
   try {
+    // Note: Deleting image from Cloudinary would require its URL and Cloudinary SDK.
+    // This is omitted here for simplicity as per the current scope.
+    // If planSnap.data()?.imageUrl exists, you'd call Cloudinary's delete API.
 
     const batch = writeBatch(db);
     const exercisesSnapshot = await getDocs(exercisesCollectionRef);
@@ -434,7 +443,7 @@ export const saveAIPlanAsNew = async (
     ageMax: 65,
     bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1] as PlanSpecificBMICategory],
     isPublished: false,
-
+    // imageUrl will be empty string by default, can be added via edit later
   };
 
   const exercisesData: Omit<Exercise, 'id' | 'planId'>[] = aiPlan.exercises.map(ex => ({
@@ -444,6 +453,7 @@ export const saveAIPlanAsNew = async (
     reps: ex.reps,
     instructions: ex.instructions || "",
   }));
+  // Pass planDataForCreation which now correctly matches the expected type for createPlan
   return createPlan(planDataForCreation as any, exercisesData);
 };
 
@@ -724,13 +734,14 @@ export const addProgressEntry = async (entry: Omit<ProgressEntry, 'id'>): Promis
   const progressCollectionRef = collection(db, 'users', entry.userId, 'progress');
   const docRef = await addDoc(progressCollectionRef, {
       ...entry,
-      date: new Date(entry.date), 
+      date: new Date(entry.date), // Store as Firestore Timestamp
   });
   return docRef.id;
 };
 
 export const getExerciseProgressForUser = async (userId: string, exerciseId: string): Promise<ProgressEntry[]> => {
   const progressCollectionRef = collection(db, 'users', userId, 'progress');
+  // The query is simplified to remove the orderBy clause, which avoids the need for a composite index.
   const q = query(
       progressCollectionRef,
       where('exerciseId', '==', exerciseId)
@@ -742,6 +753,7 @@ export const getExerciseProgressForUser = async (userId: string, exerciseId: str
       date: (doc.data().date as Timestamp).toDate().toISOString(),
   } as ProgressEntry));
 
+  // Sorting is now done on the client-side after fetching the data.
   entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return entries;
@@ -749,6 +761,7 @@ export const getExerciseProgressForUser = async (userId: string, exerciseId: str
 
 export const getAllUserProgress = async (userId: string): Promise<ProgressEntry[]> => {
   const progressCollectionRef = collection(db, 'users', userId, 'progress');
+  // Removed orderBy to avoid needing a composite index. Sorting will be done client-side.
   const q = query(progressCollectionRef);
   const querySnapshot = await getDocs(q);
   const entries = querySnapshot.docs.map(doc => ({
@@ -868,10 +881,11 @@ export const getPlansByIds = async (planIds: string[]): Promise<Plan[]> => {
       for (const planDoc of querySnapshot.docs) {
         const planData = planDoc.data() as Omit<Plan, 'id' | 'exercises' | 'createdAt' | 'updatedAt'> & { createdAt?: Timestamp, updatedAt?: Timestamp };
         
+        // This is a lean version for filtering, but now includes duration
         plans.push({
           id: planDoc.id,
           name: planData.name,
-          duration: planData.duration, 
+          duration: planData.duration, // <-- ADDED
         } as Plan); 
       }
     }
@@ -900,8 +914,55 @@ export const getAllUserPlanStatuses = async (userId: string): Promise<UserPlanSt
       });
     } catch (error) {
       console.error(`Error fetching all user plan statuses for user ${userId}:`, error);
-      return []; 
+      return []; // Return empty array on error
     }
+};
+
+export const getAllPurchasedPlans = async (userId: string): Promise<Plan[]> => {
+  const purchasedPlansCollectionRef = collection(db, 'users', userId, 'purchasedPlans');
+  const snapshot = await getDocs(purchasedPlansCollectionRef);
+  const purchasedPlanIds = snapshot.docs.map(doc => doc.id);
+
+  if (purchasedPlanIds.length === 0) {
+    return [];
+  }
+
+  const plans: Plan[] = [];
+  const CHUNK_SIZE = 30; 
+
+  for (let i = 0; i < purchasedPlanIds.length; i += CHUNK_SIZE) {
+    const chunk = purchasedPlanIds.slice(i, i + CHUNK_SIZE);
+    if (chunk.length > 0) {
+      const plansQuery = query(collection(db, 'plans'), where(documentId(), 'in', chunk));
+      const querySnapshot = await getDocs(plansQuery);
+
+      for (const planDoc of querySnapshot.docs) {
+        const planData = planDoc.data() as Omit<Plan, 'id' | 'exercises' | 'createdAt' | 'updatedAt'> & { createdAt?: Timestamp, updatedAt?: Timestamp };
+
+        let trainerName = planData.trainerName;
+        let trainerAvatarUrl = planData.trainerAvatarUrl;
+
+        if (planData.trainerId && (!trainerName || !trainerAvatarUrl)) {
+            const trainer = await getTrainerById(planData.trainerId);
+            trainerName = trainer?.name;
+            trainerAvatarUrl = trainer?.avatarUrl;
+        }
+
+        plans.push({
+          id: planDoc.id,
+          ...planData,
+          createdAt: planData.createdAt?.toDate().toISOString() || new Date().toISOString(),
+          updatedAt: planData.updatedAt?.toDate().toISOString() || new Date().toISOString(),
+          trainerName: trainerName || 'Unknown Trainer',
+          trainerAvatarUrl: trainerAvatarUrl || '',
+          rating: planData.rating || 0,
+          numberOfRatings: planData.numberOfRatings || 0,
+          imageUrl: planData.imageUrl || '',
+        } as Plan); 
+      }
+    }
+  }
+  return plans;
 };
 
 // CHAT FUNCTIONS
@@ -975,6 +1036,7 @@ export const createOrGetChatRoom = async (userId1: string, userId2: string): Pro
 
 export const getChatRoomsForUser = async (userId: string): Promise<ChatRoom[]> => {
   const chatRoomsRef = collection(db, 'chatRooms');
+  // Removed orderBy to avoid needing a composite index. Sorting will be done on the client.
   const q = query(chatRoomsRef, where('participantIds', 'array-contains', userId));
 
   try {
@@ -996,6 +1058,7 @@ export const getChatRoomsForUser = async (userId: string): Promise<ChatRoom[]> =
 
   } catch (error: any) {
     console.error("Error fetching chat rooms:", error);
+    // This specific error might not be hit anymore, but it's good to keep as a safeguard.
     if (error.code === 'failed-precondition' && error.message.toLowerCase().includes("query requires an index")) {
         console.error(
           `\n\n[data.ts] Firestore query in getChatRoomsForUser still requires an index.\n` +
@@ -1064,6 +1127,7 @@ export const markChatRoomAsRead = async (chatRoomId: string, userId: string): Pr
     }
   } catch (error) {
     console.error(`Error marking chat room ${chatRoomId} as read for user ${userId}:`, error);
+    // Don't throw, as this is not a critical failure for the user experience
   }
 };
 
@@ -1118,6 +1182,7 @@ export const deleteMessage = async (chatRoomId: string, messageId: string, userI
 
 export const deleteChatForUser = async (chatRoomId: string, userId: string): Promise<void> => {
     const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+    // Use dot notation to update a field in a map
     await updateDoc(chatRoomRef, {
         [`deletedBy.${userId}`]: serverTimestamp()
     });
@@ -1133,20 +1198,74 @@ export const hasUserPurchasedPlan = async (userId: string, planId: string): Prom
     return docSnap.exists();
   } catch (error) {
     console.error(`Error checking purchase status for user ${userId} on plan ${planId}:`, error);
-    return false; 
+    return false; // Fail safe
   }
 };
 
-export const grantPlanAccess = async (userId: string, planId: string, razorpayPaymentId: string): Promise<void> => {
-  if (!userId || !planId) throw new Error("User ID and Plan ID are required to grant access.");
+export const grantPlanAccess = async (userId: string, plan: Plan, razorpayPaymentId: string): Promise<void> => {
+  if (!userId || !plan || !plan.id) throw new Error("User ID and Plan are required to grant access.");
   
-  const purchaseDocRef = doc(db, 'users', userId, 'purchasedPlans', planId);
+  const batch = writeBatch(db);
+
+  // 1. Grant user access by creating a doc in their `purchasedPlans` subcollection
+  const purchaseDocRef = doc(db, 'users', userId, 'purchasedPlans', plan.id);
   const purchaseData: Omit<PurchasedPlan, 'id' | 'purchasedAt'> & { purchasedAt: any } = {
     userId,
-    planId,
+    planId: plan.id,
     purchasedAt: serverTimestamp(),
     razorpayPaymentId: razorpayPaymentId,
   };
+  batch.set(purchaseDocRef, purchaseData);
 
-  await setDoc(purchaseDocRef, purchaseData);
+  // 2. Record the sale in a top-level `sales` collection for easy earnings tracking
+  const saleDocRef = doc(collection(db, 'sales'));
+  const saleData = {
+    planId: plan.id,
+    planName: plan.name,
+    price: plan.price,
+    trainerId: plan.trainerId,
+    purchaserId: userId,
+    purchasedAt: serverTimestamp(),
+    razorpayPaymentId,
+  };
+  batch.set(saleDocRef, saleData);
+
+  await batch.commit();
+};
+
+export const getSalesByTrainer = async (trainerId: string): Promise<Sale[]> => {
+  if (!trainerId) return [];
+  const salesCollectionRef = collection(db, 'sales');
+  // Removed orderBy to sort on client and avoid needing a composite index
+  const q = query(salesCollectionRef, where('trainerId', '==', trainerId));
+
+  try {
+    const querySnapshot = await getDocs(q);
+    const sales = querySnapshot.docs.map(docSnap => {
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        ...data,
+        purchasedAt: (data.purchasedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+      } as Sale;
+    });
+
+    // Sort client-side to avoid needing an index
+    sales.sort((a, b) => new Date(b.purchasedAt).getTime() - new Date(a.purchasedAt).getTime());
+    return sales;
+
+  } catch (error: any) {
+    if (error.code === 'failed-precondition' && error.message.toLowerCase().includes("query requires an index")) {
+        console.error(
+          `\n\n[CRITICAL FIX REQUIRED IN FIREBASE CONSOLE]\n` +
+          `[data.ts] Firestore query in getSalesByTrainer failed because a composite index is missing for the 'sales' collection.\n` +
+          `Please create an index on the 'sales' collection with fields: 'trainerId' (Ascending) and 'purchasedAt' (Descending).\n` +
+          `The error message is: ${error.message}\n` +
+          `Returning empty array. The earnings page will show no data.\n\n`
+        );
+        return [];
+    }
+    console.error(`Error fetching sales for trainer ${trainerId}:`, error);
+    throw error;
+  }
 };

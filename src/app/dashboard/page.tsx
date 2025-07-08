@@ -8,7 +8,7 @@ import { getPlansByTrainerId, deletePlan as deletePlanData } from '@/lib/data';
 import PlanListItem from '@/components/dashboard/PlanListItem';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { PlusCircle, LayoutGrid, AlertTriangle, Search, ListFilter } from 'lucide-react';
+import { PlusCircle, LayoutGrid, AlertTriangle, Search, ListFilter, TrendingUp } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from '@/hooks/use-toast';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -74,7 +74,7 @@ export default function TrainerDashboardPage() {
     }
   };
 
-  if (loading && !allTrainerPlans.length) { 
+  if (loading && !allTrainerPlans.length) { // Show skeleton only on initial load
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -107,13 +107,20 @@ export default function TrainerDashboardPage() {
                 <LayoutGrid className="h-7 w-7"/>
                 Trainer Dashboard
             </h1>
-            <p className="text-muted-foreground mt-1">Manage your fitness plans and exercises.</p>
+            <p className="text-muted-foreground mt-1">Manage your fitness plans and view your earnings.</p>
         </div>
-        <Button asChild size="lg">
-          <Link href="/dashboard/plans/new">
-            <PlusCircle className="mr-2 h-5 w-5" /> Create New Plan
-          </Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild size="lg" variant="outline">
+            <Link href="/dashboard/earnings">
+              <TrendingUp className="mr-2 h-5 w-5" /> View Earnings
+            </Link>
+          </Button>
+          <Button asChild size="lg">
+            <Link href="/dashboard/plans/new">
+              <PlusCircle className="mr-2 h-5 w-5" /> Create New Plan
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <div className="space-y-4 p-4 border rounded-lg bg-card shadow">
@@ -134,7 +141,7 @@ export default function TrainerDashboardPage() {
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="all">All Statuses</SelectItem>
               <SelectItem value="published">Published</SelectItem>
               <SelectItem value="draft">Draft</SelectItem>
             </SelectContent>
@@ -154,7 +161,7 @@ export default function TrainerDashboardPage() {
           </div>
         </section>
       ) : (
-        !loading && (
+        !loading && ( // Only show this if not loading and no plans
           <Alert className="bg-card border-primary/30">
             <AlertTriangle className="h-5 w-5 text-primary" />
             <AlertTitle className="font-semibold">

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Star, Tag, Users, CalendarDays, BarChart3 } from 'lucide-react';
 import Image from 'next/image';
-import FavoriteToggleButton from './FavoriteToggleButton'; 
+import FavoriteToggleButton from './FavoriteToggleButton'; // Import the new component
 
 interface PlanCardProps {
   plan: Plan;
@@ -40,7 +40,7 @@ const renderStars = (rating: number, planId: string, starSizeClass = "h-4 w-4") 
 
 const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
   const imageSrc = plan.imageUrl || `https://placehold.co/400x200.png?text=${encodeURIComponent(plan.name.substring(0,15))}`;
-  const imageHint = plan.imageUrl ? plan.name : "fitness abstract"; 
+  const imageHint = plan.imageUrl ? plan.name : "fitness abstract"; // Use plan name as hint if specific image, otherwise generic
 
   return (
     <Link href={`/plans/${plan.id}`} className="block group">
@@ -52,7 +52,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
             fill
             className="object-cover"
             data-ai-hint={imageHint}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" 
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" // Basic example, adjust as needed
           />
            <div className="absolute top-3 right-3 flex items-center gap-2">
             <FavoriteToggleButton 
@@ -61,7 +61,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
                 className="relative z-10 h-9 w-9 rounded-full bg-black/20 text-white/80 backdrop-blur-sm transition-all hover:bg-black/30 hover:text-white"
             />
             <div className="flex items-center justify-center rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-lg">
-                {plan.price === 0 ? 'Free' : `$${plan.price.toFixed(2)}`}
+                {plan.price === 0 ? 'Free' : `₹${plan.price.toFixed(2)}`}
             </div>
           </div>
         </div>

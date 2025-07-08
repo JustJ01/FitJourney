@@ -4,7 +4,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import type { ProgressEntry, Plan, UserPlanStatus } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
-import { getAllUserProgress, getPlansByIds, getAllUserPlanStatuses } from '@/lib/data';
+import { getAllUserProgress, getAllUserPlanStatuses, getAllPurchasedPlans } from '@/lib/data';
 import { toast } from '@/hooks/use-toast';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { History, Activity, ListFilter, Clock, CheckCircle, Dumbbell as DumbbellIcon } from 'lucide-react';
@@ -14,7 +14,10 @@ import { ProgressOverview } from '@/components/profile/ProgressOverview';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
 
+// Helper to parse duration string to total days
 const parseDurationToDays = (duration: string): number => {
     if (!duration) return 0;
     const parts = duration.toLowerCase().split(' ');
@@ -31,7 +34,7 @@ const parseDurationToDays = (duration: string): number => {
         return value * 7;
       case 'month':
       case 'months':
-        return value * 30;
+        return value * 30; // Approximation
       case 'day':
       case 'days':
         return value;
@@ -53,40 +56,38 @@ export default function MyProgressPage() {
         if (user) {
             setLoading(true);
             Promise.all([
+                getAllPurchasedPlans(user.id),
                 getAllUserProgress(user.id),
                 getAllUserPlanStatuses(user.id)
-            ]).then(async ([progressData, statusData]) => {
+            ]).then(([purchasedPlans, progressData, statusData]) => {
+                setTrackedPlans(purchasedPlans);
                 setAllProgressEntries(progressData);
                 setAllPlanStatuses(statusData);
-
-                const statusPlanIds = statusData.map(s => s.planId);
-                const progressPlanIds = progressData.map(p => p.planId);
-                const planIds = [...new Set([...statusPlanIds, ...progressPlanIds])];
-                
-                if (planIds.length > 0) {
-                    const plans = await getPlansByIds(planIds);
-                    setTrackedPlans(plans);
-                }
             })
             .catch(err => {
-                console.error("Failed to fetch progress:", err);
+                console.error("Failed to fetch progress for purchased plans:", err);
                 toast({ title: "Error", description: "Could not load your progress data.", variant: "destructive" });
             })
             .finally(() => setLoading(false));
         }
     }, [user]);
 
+    const entriesFromPurchasedPlans = useMemo(() => {
+        const purchasedPlanIds = new Set(trackedPlans.map(p => p.id));
+        return allProgressEntries.filter(entry => purchasedPlanIds.has(entry.planId));
+    }, [allProgressEntries, trackedPlans]);
+
     const entriesForOverview = useMemo(() => {
         if (selectedPlanId === 'all' || selectedPlanId === 'all-activity') {
-            return allProgressEntries;
+            return entriesFromPurchasedPlans;
         }
-        return allProgressEntries.filter(entry => entry.planId === selectedPlanId);
-    }, [allProgressEntries, selectedPlanId]);
+        return entriesFromPurchasedPlans.filter(entry => entry.planId === selectedPlanId);
+    }, [entriesFromPurchasedPlans, selectedPlanId]);
     
     const planSummaries = useMemo(() => {
         return trackedPlans.map(plan => {
             const status = allPlanStatuses.find(s => s.planId === plan.id);
-            const entries = allProgressEntries.filter(e => e.planId === plan.id);
+            const entries = entriesFromPurchasedPlans.filter(e => e.planId === plan.id);
 
             const totalDays = parseDurationToDays(plan.duration || '0');
             const completedDays = status?.completedDays?.length || 0;
@@ -104,7 +105,7 @@ export default function MyProgressPage() {
                 totalTime,
             };
         }).filter(summary => summary.totalDays > 0 || summary.totalVolume > 0 || summary.totalTime > 0) as (Plan & { totalDays: number, completedDays: number, completionPercentage: number, totalVolume: number, totalTime: number })[];
-    }, [trackedPlans, allPlanStatuses, allProgressEntries]);
+    }, [trackedPlans, allPlanStatuses, entriesFromPurchasedPlans]);
 
 
     if (loading) {
@@ -131,7 +132,7 @@ export default function MyProgressPage() {
                 </div>
                 <h1 className="text-3xl font-bold tracking-tight">My Progress History</h1>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                    An overview of your progress across all fitness plans. Select a view to analyze your progress.
+                    An overview of your progress across all your purchased fitness plans.
                 </p>
             </CardHeader>
 
@@ -164,7 +165,7 @@ export default function MyProgressPage() {
             )}
 
             {selectedPlanId === 'all' ? (
-           
+                // Show summary cards
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {planSummaries.length > 0 ? (
                         planSummaries.map(summary => (
@@ -208,9 +209,12 @@ export default function MyProgressPage() {
                          <div className="md:col-span-2">
                              <Alert>
                                 <Activity className="h-4 w-4" />
-                                <AlertTitle>No Progress Logged Yet</AlertTitle>
+                                <AlertTitle>{trackedPlans.length === 0 ? "No Purchased Plans" : "No Progress Logged Yet"}</AlertTitle>
                                 <AlertDescription>
-                                    You haven't logged any workout progress. Go to a plan's detail page and use the "Log Progress" button to get started!
+                                    {trackedPlans.length === 0
+                                        ? <>You have not purchased any plans yet. <Button variant="link" asChild className="p-0 h-auto"><Link href="/plans">Explore plans</Link></Button> to get started.</>
+                                        : "You haven't logged any workout progress. Go to a plan's detail page and use the \"Log Progress\" button to get started!"
+                                    }
                                 </AlertDescription>
                             </Alert>
                         </div>

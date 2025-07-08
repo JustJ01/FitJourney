@@ -8,7 +8,7 @@ export interface User {
   name: string;
   email: string;
   role: 'member' | 'trainer';
-  avatarUrl?: string; 
+  avatarUrl?: string; // Will now store Cloudinary URL
   age?: number;
   weight?: number; // in kg
   height?: number; // in cm
@@ -24,7 +24,7 @@ export interface Trainer extends User {
 
 export interface UserProfileUpdateData {
   name?: string;
-  avatarUrl?: string; 
+  avatarUrl?: string; // This will be the Cloudinary URL string or "" for removal
   age?: number;
   weight?: number;
   height?: number;
@@ -63,7 +63,7 @@ export interface Plan {
   targetAudience: string;
   trainerId: string;
   trainerName?: string;
-  trainerAvatarUrl?: string;
+  trainerAvatarUrl?: string; // Will now store Cloudinary URL
   ageMin: number;
   ageMax: number;
   bmiCategories: PlanSpecificBMICategory[];
@@ -71,7 +71,7 @@ export interface Plan {
   updatedAt: string;
   exercises?: Exercise[];
   isPublished?: boolean;
-  imageUrl?: string; 
+  imageUrl?: string; // Will now store Cloudinary URL
 }
 
 export interface AIPlanRequest {
@@ -174,6 +174,17 @@ export interface PurchasedPlan {
   id: string; // planId
   userId: string;
   planId: string;
+  purchasedAt: string; // ISO string
+  razorpayPaymentId: string;
+}
+
+export interface Sale {
+  id: string;
+  planId: string;
+  planName: string;
+  price: number;
+  trainerId: string;
+  purchaserId: string;
   purchasedAt: string; // ISO string
   razorpayPaymentId: string;
 }

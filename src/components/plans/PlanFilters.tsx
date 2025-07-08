@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react'; // Import useState and useEffect
 import type { PlanFilters, BMICategory } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,7 @@ import { BMI_CATEGORIES, PLAN_DURATIONS, DEFAULT_AGE_RANGE, DEFAULT_PRICE_RANGE 
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Filter, RefreshCcw } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Skeleton } from '@/components/ui/skeleton'; 
+import { Skeleton } from '@/components/ui/skeleton'; // Import Skeleton
 
 interface PlanFiltersProps {
   filters: PlanFilters;
@@ -127,7 +127,7 @@ const PlanFiltersComponent: React.FC<PlanFiltersProps> = ({ filters, onFilterCha
           <AccordionItem value="price">
             <AccordionTrigger className="text-base font-semibold">Price Range</AccordionTrigger>
             <AccordionContent className="pt-4 space-y-2">
-              <Label>Price: ${filters.price[0]} - ${filters.price[1] === DEFAULT_PRICE_RANGE[1] ? `${DEFAULT_PRICE_RANGE[1]}+` : filters.price[1]}</Label>
+              <Label>Price: ₹{filters.price[0]} - {filters.price[1] === DEFAULT_PRICE_RANGE[1] ? `₹${DEFAULT_PRICE_RANGE[1]}+` : `₹${filters.price[1]}`}</Label>
               <Slider
                 min={DEFAULT_PRICE_RANGE[0]}
                 max={DEFAULT_PRICE_RANGE[1]}

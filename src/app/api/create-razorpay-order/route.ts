@@ -1,35 +1,64 @@
 
 import { NextResponse } from 'next/server';
-import { razorpayInstance } from '@/lib/razorpay';
-import { getPlanById } from '@/lib/data';
-import { v4 as uuidv4 } from 'uuid';
+import crypto from 'crypto';
+import { grantPlanAccess, getPlanById } from '@/lib/data';
 
 export async function POST(request: Request) {
   try {
-    const { planId } = await request.json();
+    const body = await request.json();
+    console.log("Received payment verification request with body:", JSON.stringify(body, null, 2));
 
-    if (!planId) {
-      return NextResponse.json({ error: 'Plan ID is required.' }, { status: 400 });
+    const { 
+        razorpay_order_id, 
+        razorpay_payment_id, 
+        razorpay_signature,
+        userId,
+        planId 
+    } = body;
+
+    const missingFields = [];
+    if (!razorpay_order_id) missingFields.push("razorpay_order_id");
+    if (!razorpay_payment_id) missingFields.push("razorpay_payment_id");
+    if (!razorpay_signature) missingFields.push("razorpay_signature");
+    if (!userId) missingFields.push("userId");
+    if (!planId) missingFields.push("planId");
+
+    if (missingFields.length > 0) {
+        const error = `Missing required payment verification fields: ${missingFields.join(', ')}`;
+        console.error(error, { receivedBody: body });
+        return NextResponse.json({ error }, { status: 400 });
     }
     
-    const plan = await getPlanById(planId);
-
-    if (!plan || plan.price <= 0) {
-      return NextResponse.json({ error: 'Plan is not purchasable or does not exist.' }, { status: 400 });
+    if(!process.env.RAZORPAY_KEY_SECRET) {
+        throw new Error('Razorpay key secret is not set in environment variables.');
     }
 
-    const options = {
-        amount: Math.round(plan.price * 100), 
-        currency: "INR",
-        receipt: `receipt_plan_${uuidv4()}`
-    };
+    const hmacBody = razorpay_order_id + "|" + razorpay_payment_id;
 
-    const order = await razorpayInstance.orders.create(options);
-    
-    return NextResponse.json(order);
+    const expectedSignature = crypto
+        .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+        .update(hmacBody.toString())
+        .digest('hex');
+
+    const isAuthentic = expectedSignature === razorpay_signature;
+
+    if (isAuthentic) {
+      // Fetch plan details to get trainerId and price for the sales record
+      const plan = await getPlanById(planId);
+      if (!plan) {
+          return NextResponse.json({ error: 'Plan not found for purchase record.' }, { status: 404 });
+      }
+
+      // Signature is authentic, grant access to the plan and record the sale
+      await grantPlanAccess(userId, plan, razorpay_payment_id);
+
+      return NextResponse.json({ success: true, message: "Payment verified successfully." });
+    } else {
+      return NextResponse.json({ success: false, error: 'Invalid signature.' }, { status: 400 });
+    }
 
   } catch (error: any) {
-    console.error('Error creating Razorpay order:', error);
-    return NextResponse.json({ error: error.message || 'Failed to create Razorpay order.' }, { status: 500 });
+    console.error('Error verifying Razorpay payment:', error);
+    return NextResponse.json({ error: error.message || 'Payment verification failed.' }, { status: 500 });
   }
 }
