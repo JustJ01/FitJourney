@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/hooks/useAuth';
-import { LogIn, LogOut, UserCircle, LayoutDashboard, Heart, LineChart } from 'lucide-react';
+import { LogIn, LogOut, UserCircle, LayoutDashboard, Heart, LineChart, MessageSquare } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 const UserNav = () => {
@@ -69,6 +69,12 @@ const UserNav = () => {
             <Link href="/profile"> 
               <UserCircle className="mr-2 h-4 w-4" />
               <span>Profile</span>
+            </Link>
+          </DropdownMenuItem>
+           <DropdownMenuItem asChild className="cursor-pointer">
+            <Link href="/chat">
+              <MessageSquare className="mr-2 h-4 w-4" />
+              <span>Messages</span>
             </Link>
           </DropdownMenuItem>
           {user.role === 'member' && (

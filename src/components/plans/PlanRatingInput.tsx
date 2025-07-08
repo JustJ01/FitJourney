@@ -32,7 +32,7 @@ export default function PlanRatingInput({ planId }: PlanRatingInputProps) {
         })
         .catch(err => {
           if (isMounted) console.error("Error fetching user rating:", err);
-          // Optional: toast for error fetching existing rating
+          
         })
         .finally(() => {
           if (isMounted) setIsLoadingUserRating(false);

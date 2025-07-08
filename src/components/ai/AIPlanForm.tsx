@@ -38,7 +38,7 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
       bmi: 22,
       experienceLevel: "beginner",
       availableEquipment: "",
-      workoutFrequency: WORKOUT_FREQUENCIES[0], // Default to "As per AI suggestion"
+      workoutFrequency: WORKOUT_FREQUENCIES[0], 
       muscleFocus: "",
     },
   });

@@ -1,10 +1,8 @@
-
-import type { User, Trainer, Plan, Exercise, AIGeneratedPlan, UserProfileUpdateData, TrainerProfileUpdateData, PlanSpecificBMICategory, PlanRating, Review, ProgressEntry, UserPlanStatus } from '@/types';
-import { db } from './firebase';
-import { collection, query, where, getDocs, doc, getDoc, Timestamp, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, setDoc, documentId, FieldPath, runTransaction, orderBy, limit as firestoreLimit, collectionGroup } from 'firebase/firestore';
+import type { User, Trainer, Plan, Exercise, AIGeneratedPlan, UserProfileUpdateData, TrainerProfileUpdateData, PlanSpecificBMICategory, PlanRating, Review, ProgressEntry, UserPlanStatus, ChatRoom, ChatMessage, PurchasedPlan } from '@/types';
+import { db } from './firebase'; 
+import { collection, query, where, getDocs, doc, getDoc, Timestamp, addDoc, updateDoc, deleteDoc, writeBatch, serverTimestamp, setDoc, documentId, FieldPath, runTransaction, orderBy, limit as firestoreLimit, collectionGroup, arrayUnion, deleteField } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { ACTUAL_PLAN_BMI_CATEGORIES } from './constants';
-
 
 export const getPublishedPlans = async (): Promise<Plan[]> => {
   try {
@@ -56,7 +54,7 @@ export const getPublishedPlans = async (): Promise<Plan[]> => {
   }
 };
 
-
+// Get the top N highest-rated published plans
 export const getHighestRatedPlans = async (count: number = 3): Promise<Plan[]> => {
   try {
     const plansCollectionRef = collection(db, 'plans');
@@ -107,7 +105,13 @@ export const getHighestRatedPlans = async (count: number = 3): Promise<Plan[]> =
   } catch (error: any) {
     if (error.code === 'failed-precondition' && error.message && error.message.toLowerCase().includes("query requires an index")) {
       console.error(
-        `\n\n[CRITICAL FIX REQUIRED]\n`
+        `\n\n[CRITICAL FIX REQUIRED IN FIREBASE CONSOLE]\n` +
+        `[data.ts] Firestore query in getHighestRatedPlans failed because a composite index is missing.\n` +
+        `This is NOT a bug in the Next.js code. You MUST create this index in your Firebase project.\n` +
+        `The error message usually provides a direct link to create it. Look for something like: \n` +
+        `${error.message}\n` +
+        `The query involved filtering on 'isPublished' (ASC) and ordering by 'rating' (DESC) then 'numberOfRatings' (DESC) on the 'plans' collection.\n` +
+        `Returning an empty array for featured plans. The homepage will show 'No featured plans'.\n\n`
       );
       return [];
     }
@@ -117,7 +121,7 @@ export const getHighestRatedPlans = async (count: number = 3): Promise<Plan[]> =
 };
 
 
-
+// Get a single plan by ID with its exercises
 export const getPlanById = async (id: string): Promise<Plan | undefined> => {
   try {
     const planDocRef = doc(db, 'plans', id);
@@ -232,6 +236,7 @@ export const getTrainerById = async (id: string): Promise<Trainer | undefined> =
         weight: data.weight,
         height: data.height,
         gender: data.gender,
+        lastSeen: (data.lastSeen as Timestamp)?.toDate().toISOString(),
       } as Trainer;
     }
     return undefined;
@@ -258,17 +263,18 @@ export const getUserById = async (id: string): Promise<User | undefined> => {
               id: userDocSnap.id,
               name: data.name || '',
               email: data.email || '',
-              role: 'member', // Assuming this function only fetches members, or role is stored
+              role: 'member', 
               avatarUrl: data.avatarUrl || '',
               age: data.age,
               weight: data.weight,
               height: data.height,
               gender: data.gender,
+              lastSeen: (data.lastSeen as Timestamp)?.toDate().toISOString(),
           } as User;
       }
       // If not found in 'users', check 'trainers' as a user could be a trainer
       const trainerProfile = await getTrainerById(id);
-      if (trainerProfile) return trainerProfile as User; // Cast as User for consistent return type if used generically
+      if (trainerProfile) return trainerProfile as User;
 
       return undefined;
     } catch (error: any) {
@@ -299,7 +305,7 @@ export const createPlan = async (
     trainerAvatarUrl: trainerAvatarUrlResolved || '',
     rating: 0,
     numberOfRatings: 0,
-    imageUrl: planData.imageUrl || "", // Will come from PlanForm after Cloudinary upload
+    imageUrl: planData.imageUrl || "", 
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
     isPublished: planData.isPublished === undefined ? false : planData.isPublished,
@@ -341,16 +347,13 @@ export const updatePlan = async (
       planUpdateData.trainerName = trainerDetails?.name || planData.trainerName || 'Unknown Trainer';
       planUpdateData.trainerAvatarUrl = trainerDetails?.avatarUrl || planData.trainerAvatarUrl || '';
   }
-  
-  // If imageUrl is explicitly set to "" in planData, it means remove.
-  // If imageUrl is a new URL, it means update.
-  // If imageUrl is undefined in planData, it means no change intended from form for this field.
+
   if (planData.imageUrl !== undefined) {
     planUpdateData.imageUrl = planData.imageUrl;
   }
 
 
-  await updateDoc(planDocRef, planUpdateData as any); // Cast as any because serverTimestamp type clashes
+  await updateDoc(planDocRef, planUpdateData as any);
 
   const exercisesCollectionRef = collection(db, 'plans', planId, 'exercises');
   const existingExercisesSnapshot = await getDocs(exercisesCollectionRef);
@@ -379,9 +382,6 @@ export const deletePlan = async (planId: string): Promise<boolean> => {
   const reviewsCollectionRef = collection(db, 'plans', planId, 'reviews');
 
   try {
-    // Note: Deleting image from Cloudinary would require its URL and Cloudinary SDK.
-    // This is omitted here for simplicity as per the current scope.
-    // If planSnap.data()?.imageUrl exists, you'd call Cloudinary's delete API.
 
     const batch = writeBatch(db);
     const exercisesSnapshot = await getDocs(exercisesCollectionRef);
@@ -434,7 +434,7 @@ export const saveAIPlanAsNew = async (
     ageMax: 65,
     bmiCategories: [ACTUAL_PLAN_BMI_CATEGORIES[1] as PlanSpecificBMICategory],
     isPublished: false,
-    // imageUrl will be empty string by default, can be added via edit later
+
   };
 
   const exercisesData: Omit<Exercise, 'id' | 'planId'>[] = aiPlan.exercises.map(ex => ({
@@ -444,7 +444,6 @@ export const saveAIPlanAsNew = async (
     reps: ex.reps,
     instructions: ex.instructions || "",
   }));
-  // Pass planDataForCreation which now correctly matches the expected type for createPlan
   return createPlan(planDataForCreation as any, exercisesData);
 };
 
@@ -704,7 +703,14 @@ export const getFeaturedReviews = async (count: number = 2): Promise<Review[]> =
   } catch (error: any) {
     if (error.code === 'failed-precondition' && error.message && error.message.toLowerCase().includes("query requires an index")) {
       console.error(
-        `\n\n[CRITICAL FIX REQUIRED]\n`
+        `\n\n[CRITICAL FIX REQUIRED IN FIREBASE CONSOLE]\n` +
+        `[data.ts] Firestore query in getFeaturedReviews failed because a composite index is missing for the 'reviews' collection group.\n` +
+        `This is NOT a bug in the Next.js code. You MUST create this index in your Firebase project.\n` +
+        `The error message usually provides a direct link to create it. Look for something like: \n` +
+        `${error.message}\n` +
+        `The query involved ordering by 'rating' (DESC) and then 'createdAt' (DESC) on the 'reviews' collection group.\n` +
+        `You need to create a composite index on the 'reviews' collection group with fields: 'rating' (Descending) and 'createdAt' (Descending).\n` +
+        `Returning an empty array for featured reviews. The homepage will show 'No reviews'.\n\n`
       );
       return [];
     }
@@ -718,14 +724,13 @@ export const addProgressEntry = async (entry: Omit<ProgressEntry, 'id'>): Promis
   const progressCollectionRef = collection(db, 'users', entry.userId, 'progress');
   const docRef = await addDoc(progressCollectionRef, {
       ...entry,
-      date: new Date(entry.date), // Store as Firestore Timestamp
+      date: new Date(entry.date), 
   });
   return docRef.id;
 };
 
 export const getExerciseProgressForUser = async (userId: string, exerciseId: string): Promise<ProgressEntry[]> => {
   const progressCollectionRef = collection(db, 'users', userId, 'progress');
-  // The query is simplified to remove the orderBy clause, which avoids the need for a composite index.
   const q = query(
       progressCollectionRef,
       where('exerciseId', '==', exerciseId)
@@ -737,7 +742,6 @@ export const getExerciseProgressForUser = async (userId: string, exerciseId: str
       date: (doc.data().date as Timestamp).toDate().toISOString(),
   } as ProgressEntry));
 
-  // Sorting is now done on the client-side after fetching the data.
   entries.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return entries;
@@ -745,7 +749,6 @@ export const getExerciseProgressForUser = async (userId: string, exerciseId: str
 
 export const getAllUserProgress = async (userId: string): Promise<ProgressEntry[]> => {
   const progressCollectionRef = collection(db, 'users', userId, 'progress');
-  // Removed orderBy to avoid needing a composite index. Sorting will be done client-side.
   const q = query(progressCollectionRef);
   const querySnapshot = await getDocs(q);
   const entries = querySnapshot.docs.map(doc => ({
@@ -865,11 +868,10 @@ export const getPlansByIds = async (planIds: string[]): Promise<Plan[]> => {
       for (const planDoc of querySnapshot.docs) {
         const planData = planDoc.data() as Omit<Plan, 'id' | 'exercises' | 'createdAt' | 'updatedAt'> & { createdAt?: Timestamp, updatedAt?: Timestamp };
         
-        // This is a lean version for filtering, but now includes duration
         plans.push({
           id: planDoc.id,
           name: planData.name,
-          duration: planData.duration, // <-- ADDED
+          duration: planData.duration, 
         } as Plan); 
       }
     }
@@ -898,6 +900,253 @@ export const getAllUserPlanStatuses = async (userId: string): Promise<UserPlanSt
       });
     } catch (error) {
       console.error(`Error fetching all user plan statuses for user ${userId}:`, error);
-      return []; // Return empty array on error
+      return []; 
     }
+};
+
+// CHAT FUNCTIONS
+
+export const createOrGetChatRoom = async (userId1: string, userId2: string): Promise<ChatRoom> => {
+  const chatRoomId = [userId1, userId2].sort().join('_');
+  const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+  const chatRoomSnap = await getDoc(chatRoomRef);
+
+  if (chatRoomSnap.exists()) {
+    const data = chatRoomSnap.data();
+    const deletedByData = data.deletedBy || {};
+    
+    // Convert Firestore Timestamps to ISO strings for the client
+    const clientDeletedBy: {[key: string]: string} = {};
+    Object.keys(deletedByData).forEach(key => {
+        if (deletedByData[key] instanceof Timestamp) {
+            clientDeletedBy[key] = deletedByData[key].toDate().toISOString();
+        }
+    });
+    
+    // Undelete chat for the user initiating it, if it was previously deleted.
+    if (clientDeletedBy[userId1]) {
+        delete clientDeletedBy[userId1];
+        await updateDoc(chatRoomRef, {
+            [`deletedBy.${userId1}`]: deleteField()
+        });
+    }
+
+    return { 
+        id: chatRoomSnap.id, 
+        ...data,
+        participants: data.participants || {},
+        updatedAt: (data.updatedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+        lastMessageTimestamp: (data.lastMessageTimestamp as Timestamp)?.toDate().toISOString() || undefined,
+        deletedBy: clientDeletedBy
+    } as ChatRoom;
+  } else {
+    const user1Profile = await getUserById(userId1);
+    const user2Profile = await getUserById(userId2);
+
+    if (!user1Profile || !user2Profile) {
+      throw new Error("One or both user profiles not found for chat room creation.");
+    }
+
+    const newChatRoomData = {
+      participantIds: [userId1, userId2],
+      participants: {
+        [userId1]: { name: user1Profile.name, avatarUrl: user1Profile.avatarUrl || '', role: user1Profile.role },
+        [userId2]: { name: user2Profile.name, avatarUrl: user2Profile.avatarUrl || '', role: user2Profile.role }
+      },
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      lastMessage: '',
+      lastMessageSenderId: '',
+      readBy: [],
+      deletedBy: {},
+    };
+
+    await setDoc(chatRoomRef, newChatRoomData);
+    const newSnap = await getDoc(chatRoomRef);
+    const newSnapData = newSnap.data();
+    return { 
+        id: newSnap.id, 
+        ...newSnapData,
+        updatedAt: (newSnapData?.updatedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+    } as ChatRoom;
+  }
+};
+
+
+export const getChatRoomsForUser = async (userId: string): Promise<ChatRoom[]> => {
+  const chatRoomsRef = collection(db, 'chatRooms');
+  const q = query(chatRoomsRef, where('participantIds', 'array-contains', userId));
+
+  try {
+    const querySnapshot = await getDocs(q);
+    const rooms = querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      updatedAt: (doc.data().updatedAt as Timestamp)?.toDate().toISOString() || new Date().toISOString(),
+    } as ChatRoom));
+
+    // Sort the rooms by updatedAt timestamp in descending order in the code.
+    rooms.sort((a, b) => {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+    });
+
+    return rooms;
+
+  } catch (error: any) {
+    console.error("Error fetching chat rooms:", error);
+    if (error.code === 'failed-precondition' && error.message.toLowerCase().includes("query requires an index")) {
+        console.error(
+          `\n\n[data.ts] Firestore query in getChatRoomsForUser still requires an index.\n` +
+          `The query involved filtering on 'participantIds'. If this error persists, an index might be needed even without ordering.\n`
+        );
+        return [];
+    }
+    throw error;
+  }
+};
+
+export const sendMessage = async (chatRoomId: string, senderId: string, text: string): Promise<void> => {
+  const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+  const messagesRef = collection(chatRoomRef, 'messages');
+  
+  const newMessage: Omit<ChatMessage, 'id' | 'timestamp'> & { timestamp: any } = {
+    chatRoomId,
+    senderId,
+    text,
+    readBy: [senderId],
+    timestamp: serverTimestamp(),
+  };
+
+  await runTransaction(db, async (transaction) => {
+    const chatRoomSnap = await transaction.get(chatRoomRef);
+    if (!chatRoomSnap.exists()) {
+        throw new Error("Chat room does not exist!");
+    }
+    const chatRoomData = chatRoomSnap.data();
+
+    // 1. Add the new message
+    transaction.set(doc(messagesRef), newMessage);
+
+    const updateData: {[key: string]: any} = {
+      lastMessage: text,
+      lastMessageSenderId: senderId,
+      updatedAt: serverTimestamp(),
+      readBy: [senderId],
+    };
+
+    // "Undelete" the chat for both participants if they had previously deleted it
+    // so they can see the new message.
+    chatRoomData.participantIds.forEach((pid: string) => {
+        if (chatRoomData.deletedBy?.[pid]) {
+            updateData[`deletedBy.${pid}`] = deleteField();
+        }
+    });
+
+    // 2. Update the parent chatRoom document
+    transaction.update(chatRoomRef, updateData);
+  });
+};
+
+export const markChatRoomAsRead = async (chatRoomId: string, userId: string): Promise<void> => {
+  const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+  try {
+    const chatRoomSnap = await getDoc(chatRoomRef);
+    if (chatRoomSnap.exists()) {
+      const roomData = chatRoomSnap.data();
+      const readBy: string[] = roomData.readBy || [];
+      if (!readBy.includes(userId)) {
+        await updateDoc(chatRoomRef, {
+          readBy: [...readBy, userId]
+        });
+      }
+    }
+  } catch (error) {
+    console.error(`Error marking chat room ${chatRoomId} as read for user ${userId}:`, error);
+  }
+};
+
+export const markMessagesAsRead = async (chatRoomId: string, userId: string): Promise<void> => {
+    const messagesRef = collection(db, 'chatRooms', chatRoomId, 'messages');
+    const queryToUpdate = query(messagesRef, where('senderId', '!=', userId));
+    
+    try {
+      const messagesToUpdateSnap = await getDocs(queryToUpdate);
+      const batch = writeBatch(db);
+      messagesToUpdateSnap.docs.forEach(docSnap => {
+          const message = docSnap.data() as ChatMessage;
+          // Ensure readBy is an array before checking
+          if (Array.isArray(message.readBy) && !message.readBy.includes(userId)) {
+              batch.update(docSnap.ref, { readBy: arrayUnion(userId) });
+          } else if (!Array.isArray(message.readBy)) {
+              // Handle case where readBy might be missing or not an array
+              batch.update(docSnap.ref, { readBy: [userId] });
+          }
+      });
+      await batch.commit();
+    } catch (error) {
+      console.error("Error marking messages as read:", error);
+    }
+};
+
+export const deleteMessage = async (chatRoomId: string, messageId: string, userId: string): Promise<void> => {
+    const messageRef = doc(db, 'chatRooms', chatRoomId, 'messages', messageId);
+    const messageSnap = await getDoc(messageRef);
+  
+    if (!messageSnap.exists() || messageSnap.data().senderId !== userId) {
+      throw new Error("Message not found or you don't have permission to delete it.");
+    }
+  
+    const deletedMessageText = "This message was deleted";
+    await updateDoc(messageRef, {
+      text: deletedMessageText,
+      isDeleted: true,
+    });
+  
+    const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+    const q = query(collection(chatRoomRef, 'messages'), orderBy('timestamp', 'desc'), firestoreLimit(1));
+    const latestMessageSnap = await getDocs(q);
+    
+    // If the message being deleted is the most recent one, update the chatroom's last message preview.
+    if (!latestMessageSnap.empty && latestMessageSnap.docs[0].id === messageId) {
+        await updateDoc(chatRoomRef, {
+            lastMessage: deletedMessageText,
+        });
+    }
+};
+
+export const deleteChatForUser = async (chatRoomId: string, userId: string): Promise<void> => {
+    const chatRoomRef = doc(db, 'chatRooms', chatRoomId);
+    await updateDoc(chatRoomRef, {
+        [`deletedBy.${userId}`]: serverTimestamp()
+    });
+};
+
+// PAYMENT / PURCHASE FUNCTIONS
+
+export const hasUserPurchasedPlan = async (userId: string, planId: string): Promise<boolean> => {
+  if (!userId || !planId) return false;
+  const purchaseDocRef = doc(db, 'users', userId, 'purchasedPlans', planId);
+  try {
+    const docSnap = await getDoc(purchaseDocRef);
+    return docSnap.exists();
+  } catch (error) {
+    console.error(`Error checking purchase status for user ${userId} on plan ${planId}:`, error);
+    return false; 
+  }
+};
+
+export const grantPlanAccess = async (userId: string, planId: string, razorpayPaymentId: string): Promise<void> => {
+  if (!userId || !planId) throw new Error("User ID and Plan ID are required to grant access.");
+  
+  const purchaseDocRef = doc(db, 'users', userId, 'purchasedPlans', planId);
+  const purchaseData: Omit<PurchasedPlan, 'id' | 'purchasedAt'> & { purchasedAt: any } = {
+    userId,
+    planId,
+    purchasedAt: serverTimestamp(),
+    razorpayPaymentId: razorpayPaymentId,
+  };
+
+  await setDoc(purchaseDocRef, purchaseData);
 };

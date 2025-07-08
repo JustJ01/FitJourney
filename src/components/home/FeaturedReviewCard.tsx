@@ -14,7 +14,7 @@ interface FeaturedReviewCardProps {
   review: Review;
 }
 
-const COMMENT_CHARACTER_LIMIT = 150; // Adjust as needed
+const COMMENT_CHARACTER_LIMIT = 150; 
 
 const FeaturedReviewCard: React.FC<FeaturedReviewCardProps> = ({ review }) => {
   const [isExpanded, setIsExpanded] = useState(false);

@@ -1,39 +1,35 @@
 
-"use client"; // Required for useState and useEffect
+"use client";
 
-import { use, useEffect, useState, useCallback } from 'react'; // Import 'use' and 'useCallback' from React
-import { getPlanById, getTrainerById, getReviewsByPlanId, getUserPlanStatus, getPlanProgressForUser } from '@/lib/data';
+import { use, useEffect, useState, useCallback, useRef } from 'react'; 
+import { getPlanById, getTrainerById, getReviewsByPlanId, getUserPlanStatus, getPlanProgressForUser, hasUserPurchasedPlan } from '@/lib/data';
 import type { Plan, Trainer, Review, UserPlanStatus, ProgressEntry } from '@/types';
-// import { notFound } from 'next/navigation'; // notFound() cannot be called in client components directly
 import Image from 'next/image';
-import { CalendarDays, Target, Users, DollarSign, AlertTriangle, MessageSquare, Star } from 'lucide-react'; // Star instead of StarIcon
+import { CalendarDays, Target, Users, DollarSign, AlertTriangle, MessageSquare, Star, ShoppingCart } from 'lucide-react';
 import ExerciseDisplay from '@/components/plans/ExerciseDisplay';
 import TrainerInfo from '@/components/plans/TrainerInfo';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import FavoriteToggleButton from '@/components/plans/FavoriteToggleButton';
 import PlanReviewsSection from '@/components/plans/PlanReviewsSection';
 import CurrentUserRatingDisplay from '@/components/plans/CurrentUserRatingDisplay';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton'; 
 import { useAuth } from '@/hooks/useAuth';
 import PlanProgressTracker from '@/components/plans/PlanProgressTracker';
 import PlanHistoryLog from '@/components/plans/PlanHistoryLog';
 import { toast } from '@/hooks/use-toast';
+import { APP_NAME } from '@/lib/constants';
 
 
 interface PlanDetailsPageProps {
   params: { id: string };
 }
 
-// Metadata generation remains a server-side concern
-// export async function generateMetadata({ params }: PlanDetailsPageProps) { ... }
-// For client component, metadata would be handled differently or in a parent layout if static
-
 export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageProps) {
-  const params = use(paramsProp); // Use React.use() to unwrap the params prop
-  const { id } = params; // Destructure id from the resolved params
+  const params = use(paramsProp);
+  const { id } = params;
 
   const { user } = useAuth();
   const [plan, setPlan] = useState<Plan | null>(null);
@@ -41,22 +37,60 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [refreshDataKey, setRefreshDataKey] = useState(0); // For forcing re-fetches
+  const [refreshDataKey, setRefreshDataKey] = useState(0);
   const [userPlanStatus, setUserPlanStatus] = useState<UserPlanStatus | null>(null);
   const [planProgress, setPlanProgress] = useState<ProgressEntry[]>([]);
+  const [hasPurchased, setHasPurchased] = useState(false);
+  const [isCheckingPurchase, setIsCheckingPurchase] = useState(true);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const razorpayScriptLoaded = useRef(false);
 
-  const fetchAllData = useCallback(async () => {
-    if (!id || !user) return;
+  useEffect(() => {
+    if (razorpayScriptLoaded.current) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+    script.onload = () => {
+      razorpayScriptLoaded.current = true;
+    };
+    script.onerror = () => {
+      console.error("Razorpay script failed to load.");
+       toast({
+        title: "Payment Error",
+        description: "Could not load payment gateway. Please refresh and try again.",
+        variant: "destructive",
+      });
+    }
+    document.body.appendChild(script);
+
+    return () => {
+      if(document.body.contains(script)){
+        document.body.removeChild(script);
+        razorpayScriptLoaded.current = false;
+      }
+    }
+  }, []);
+
+  const fetchAllUserData = useCallback(async () => {
+    if (!id || !user) {
+        setIsCheckingPurchase(false);
+        return;
+    }
+    setIsCheckingPurchase(true);
     try {
-        const [status, progress] = await Promise.all([
+        const [status, progress, purchased] = await Promise.all([
             getUserPlanStatus(user.id, id),
-            getPlanProgressForUser(user.id, id)
+            getPlanProgressForUser(user.id, id),
+            hasUserPurchasedPlan(user.id, id)
         ]);
         setUserPlanStatus(status);
         setPlanProgress(progress);
+        setHasPurchased(purchased);
     } catch (err: any) {
         console.error("[PlanDetailsPage Client] Error fetching user-specific plan data:", err);
         setError(err.message || "Failed to load your progress for this plan.");
+    } finally {
+        setIsCheckingPurchase(false);
     }
   }, [id, user]);
 
@@ -94,9 +128,100 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
 
   useEffect(() => {
       if (user && user.role === 'member' && id) {
-          fetchAllData();
+          fetchAllUserData();
+      } else {
+        setIsCheckingPurchase(false);
       }
-  }, [id, user, fetchAllData, refreshDataKey]);
+  }, [id, user, fetchAllUserData, refreshDataKey]);
+
+  const handlePurchase = async () => {
+    if (!user || !plan) return;
+    if (!razorpayScriptLoaded.current) {
+        toast({ title: "Payment Gateway Loading", description: "Please wait a moment for the payment gateway to load and try again.", variant: "default" });
+        return;
+    }
+    setIsProcessingPayment(true);
+
+    try {
+      const orderResponse = await fetch('/api/create-razorpay-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: plan.id }),
+      });
+
+      if (!orderResponse.ok) {
+        const { error: orderError } = await orderResponse.json();
+        throw new Error(orderError || "Failed to create payment order.");
+      }
+      const order = await orderResponse.json();
+
+      const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+          amount: order.amount,
+          currency: order.currency,
+          name: APP_NAME,
+          description: `Purchase of ${plan.name}`,
+          order_id: order.id,
+          handler: async function (response: any) {
+              const verificationResponse = await fetch('/api/verify-razorpay-payment', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                      razorpay_payment_id: response.razorpay_payment_id,
+                      razorpay_order_id: response.razorpay_order_id,
+                      razorpay_signature: response.razorpay_signature,
+                      userId: user.id,
+                      planId: plan.id,
+                  }),
+              });
+
+              const verificationResult = await verificationResponse.json();
+              if (!verificationResponse.ok || !verificationResult.success) {
+                  throw new Error(verificationResult.error || "Payment verification failed.");
+              }
+              
+              toast({
+                title: "Payment Successful!",
+                description: "You now have full access to this plan.",
+              });
+              setHasPurchased(true); 
+              setIsProcessingPayment(false);
+          },
+          prefill: {
+              name: user.name,
+              email: user.email,
+          },
+          theme: {
+              color: "#16A34A" 
+          },
+          modal: {
+              ondismiss: function() {
+                  setIsProcessingPayment(false);
+              }
+          }
+      };
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.on('payment.failed', function (response: any){
+            console.error(response.error);
+            toast({
+                title: "Payment Failed",
+                description: response.error.description || "Something went wrong.",
+                variant: "destructive"
+            });
+            setIsProcessingPayment(false);
+      });
+      rzp.open();
+
+    } catch (error: any) {
+      toast({
+        title: "Purchase Error",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsProcessingPayment(false);
+    }
+  };
 
 
   const handleFeedbackOrStatusChange = useCallback(() => {
@@ -161,7 +286,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
     );
   }
 
-  if (error) { // Handle error state if plan not found or other fetch error
+  if (error) {
     return (
       <div className="text-center py-10">
         <AlertTriangle className="mx-auto h-12 w-12 text-destructive" />
@@ -174,7 +299,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
     );
   }
   
-  if (!plan) { // Should be covered by error state, but as a fallback
+  if (!plan) {
      return (
       <div className="text-center py-10">
         <h2 className="text-2xl font-semibold">Plan Not Found</h2>
@@ -189,6 +314,8 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
 
   const planImageSrc = plan.imageUrl || `https://placehold.co/1200x400.png?text=${encodeURIComponent(plan.name)}`;
   const planImageHint = plan.imageUrl ? plan.name : "fitness banner";
+  const isPlanFree = plan.price === 0;
+  const canAccessContent = isPlanFree || hasPurchased;
 
   return (
     <div className="space-y-8">
@@ -219,7 +346,6 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
           <Card className="shadow-lg -mt-10 relative z-10 mx-auto max-w-6xl">
             <CardContent className="p-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4 text-center">
               <div className="flex flex-col items-center justify-center">
-                {/* <Star className="h-8 w-8 text-yellow-400 mb-1 fill-current" />  Replaced by renderStars */}
                 {renderStars(plan.rating, plan.id, "h-6 w-6", "gap-0.5 mb-1")}
                 {plan.numberOfRatings && plan.numberOfRatings > 0 ? (
                   <>
@@ -247,7 +373,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
               </div>
               <div className="flex flex-col items-center justify-center">
                 <DollarSign className="h-8 w-8 text-green-500 mb-1" />
-                <span className="font-semibold text-lg">{plan.price === 0 ? 'Free' : `$${plan.price.toFixed(2)}`}</span>
+                <span className="font-semibold text-lg">{plan.price === 0 ? 'Free' : `₹${plan.price.toFixed(2)}`}</span>
                 <span className="text-xs text-muted-foreground">Price</span>
               </div>
             </CardContent>
@@ -266,16 +392,41 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
           </Card>
         )}
 
-        <PlanProgressTracker
-            plan={plan}
-            initialStatus={userPlanStatus}
-            onStatusChange={handleFeedbackOrStatusChange}
-        />
+        {(canAccessContent && user?.role === 'member') && (
+            <PlanProgressTracker
+                plan={plan}
+                initialStatus={userPlanStatus}
+                onStatusChange={handleFeedbackOrStatusChange}
+            />
+        )}
+
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2 space-y-6">
-            <ExerciseDisplay exercises={plan.exercises || []} />
-             <PlanHistoryLog entries={planProgress} onDeleteEntry={handleProgressDeleted} />
+             {isCheckingPurchase ? (
+                 <Skeleton className="h-96 w-full rounded-lg" />
+             ) : canAccessContent ? (
+                 <>
+                    <ExerciseDisplay exercises={plan.exercises || []} />
+                    {(user?.role === 'member') && (
+                        <PlanHistoryLog entries={planProgress} onDeleteEntry={handleProgressDeleted} />
+                    )}
+                 </>
+             ) : (
+                <Card className="shadow-lg">
+                    <CardHeader>
+                        <CardTitle>Unlock Full Access</CardTitle>
+                        <CardDescription>Purchase this plan to view the detailed workout schedule and track your progress.</CardDescription>
+                    </CardHeader>
+                    <CardFooter>
+                        <Button onClick={handlePurchase} disabled={isProcessingPayment || !user} size="lg" className="w-full">
+                            <ShoppingCart className="mr-2 h-5 w-5" />
+                            {isProcessingPayment ? 'Processing...' : (user ? `Purchase for ₹${plan.price.toFixed(2)}` : "Login to Purchase")}
+                        </Button>
+                    </CardFooter>
+                </Card>
+             )}
+
              <PlanReviewsSection 
                 planId={plan.id} 
                 initialReviews={reviews} 

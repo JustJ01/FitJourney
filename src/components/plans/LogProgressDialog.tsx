@@ -45,7 +45,6 @@ const progressFormSchema = z.object({
     const isPositiveNumber = (val: unknown): val is number =>
       typeof val === 'number' && !isNaN(val) && val > 0;
 
-    // If a duration is not logged, then weight, reps, and sets are all required.
     if (!isPositiveNumber(data.duration)) {
         if (!isNonNegativeNumber(data.weight)) {
             ctx.addIssue({

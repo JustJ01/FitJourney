@@ -3,7 +3,7 @@
 
 import { useState, useEffect, type MouseEvent } from 'react';
 import { Heart } from 'lucide-react';
-import { Button, type ButtonProps } from '@/components/ui/button'; // Import ButtonProps
+import { Button, type ButtonProps } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 import { addPlanToFavorites, removePlanFromFavorites, isPlanFavorited } from '@/lib/data';
 import { toast } from '@/hooks/use-toast';

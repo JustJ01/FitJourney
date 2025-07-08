@@ -13,13 +13,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
-import type { Trainer, UserProfileUpdateData, TrainerProfileUpdateData } from '@/types'; // User type not needed for form data here
+import type { Trainer, UserProfileUpdateData, TrainerProfileUpdateData } from '@/types'; 
 import { UserCog, Save, ImageUp, Trash2 } from 'lucide-react';
 import Image from 'next/image';
 
 const commonProfileSchemaBase = {
   name: z.string().min(1, "Name is required."),
-  // avatarFile is not part of Zod schema, handled separately
 };
 
 const memberFormSchema = z.object({
@@ -82,7 +81,7 @@ export default function EditProfilePage() {
   };
 
   const handleRemoveAvatar = async () => {
-    // This will just mark for removal. The actual removal (if any) happens on form submit.
+
     setAvatarFile(null);
     setAvatarPreview(null);
     setMarkAvatarForRemoval(true);
@@ -93,7 +92,7 @@ export default function EditProfilePage() {
     if (!user) return;
     setLocalIsSubmitting(true);
 
-    let uploadedAvatarUrl: string | undefined = user.avatarUrl; // Start with existing
+    let uploadedAvatarUrl: string | undefined = user.avatarUrl;
     let avatarShouldBeRemoved = markAvatarForRemoval;
 
     if (avatarFile) {
@@ -110,7 +109,7 @@ export default function EditProfilePage() {
         }
         const result = await response.json();
         uploadedAvatarUrl = result.secure_url;
-        avatarShouldBeRemoved = false; // New avatar uploaded
+        avatarShouldBeRemoved = false; 
       } catch (error) {
         console.error("Failed to upload avatar:", error);
         toast({ title: "Avatar Upload Failed", description: (error as Error).message, variant: "destructive" });
@@ -118,7 +117,7 @@ export default function EditProfilePage() {
         return;
       }
     } else if (markAvatarForRemoval) {
-      uploadedAvatarUrl = ""; // Signal removal
+      uploadedAvatarUrl = ""; 
     }
 
     try {
@@ -140,7 +139,6 @@ export default function EditProfilePage() {
         };
       }
       
-      // Remove avatarFile from payload as updateUserProfile now expects avatarUrl
       delete (updatePayload as any).avatarFile;
 
       await updateUserProfile(updatePayload);

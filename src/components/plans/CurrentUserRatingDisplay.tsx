@@ -7,7 +7,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { getUserPlanRating } from '@/lib/data';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; // Added Card imports
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'; 
 
 interface CurrentUserRatingDisplayProps {
   planId: string;

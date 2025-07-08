@@ -28,7 +28,7 @@ const SuggestPlanModificationsOutputSchema = z.object({
   modifiedPlanJSON: z
     .string()
     .describe('The modified fitness plan in JSON format. This should be a complete JSON object representing the updated plan.'),
-  modifiedPlanTextual: z // Renamed from modificationSummary
+  modifiedPlanTextual: z
     .string()
     .describe('A full, human-readable, textual/narrative representation of the entire modified fitness plan. This should describe the plan in detail, similar to how a trainer might write it out for a client, not just a summary of what changed. This should be a textual description, not JSON.'),
 });

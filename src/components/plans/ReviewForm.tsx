@@ -104,9 +104,9 @@ export default function ReviewForm({ planId, onReviewSubmitted, existingUserRevi
       
       form.reset({ rating: 0, comment: '' }); 
       setInitialRating(0); 
-      setJustSubmitted(true); // Signal that a submission just happened
+      setJustSubmitted(true); 
 
-      onReviewSubmitted(); // Notify parent
+      onReviewSubmitted(); 
     } catch (error) {
       console.error("Failed to submit review/rating:", error);
       const errorMessage = error instanceof Error ? error.message : "Could not submit your feedback.";

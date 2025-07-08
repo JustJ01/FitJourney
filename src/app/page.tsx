@@ -5,10 +5,9 @@ import { APP_NAME } from "@/lib/constants";
 import { Lightbulb, ListChecks, Zap, Star } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; // No longer directly used here
 import { getHighestRatedPlans, getFeaturedReviews } from "@/lib/data";
 import type { Plan, Review } from "@/types";
-import FeaturedReviewCard from "@/components/home/FeaturedReviewCard"; // Import the new component
+import FeaturedReviewCard from "@/components/home/FeaturedReviewCard"; 
 
 export default async function HomePage() {
   const featuredPlansPromise = getHighestRatedPlans(3);

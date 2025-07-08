@@ -5,7 +5,6 @@ export const APP_NAME = "FitJourney";
 
 export const BMI_CATEGORIES: BMICategory[] = ['All', 'Underweight', 'Normal', 'Overweight', 'Obese'];
 
-// Specific BMI categories that a plan can be assigned, excluding 'All'
 export const ACTUAL_PLAN_BMI_CATEGORIES = ['Underweight', 'Normal', 'Overweight', 'Obese'] as const;
 
 export const FITNESS_GOALS = [
@@ -39,7 +38,7 @@ export const DAYS_OF_WEEK = [
   "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday", "Daily"
 ] as const;
 
-export const DEFAULT_AGE_RANGE: [number, number] = [10, 100]; // Updated range
+export const DEFAULT_AGE_RANGE: [number, number] = [10, 100]; 
 export const DEFAULT_PRICE_RANGE: [number, number] = [0, 200];
 
 export const WORKOUT_FREQUENCIES = [

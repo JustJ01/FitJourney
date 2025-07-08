@@ -20,10 +20,9 @@ interface ThemeProviderProps {
 
 export function ThemeProvider({
   children,
-  defaultTheme = "system", // Server renders with this, client first render also uses this
+  defaultTheme = "system", 
   storageKey = "fitjourney-theme",
 }: ThemeProviderProps) {
-  // Initialize theme state with defaultTheme for server and initial client render
   const [theme, setThemeState] = useState<Theme>(defaultTheme);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export function ThemeProvider({
     }
     // If no theme is stored, it remains defaultTheme (e.g., "system")
     // The next effect will handle applying "system" preference correctly.
-  }, [storageKey]); // Empty dependency array means this runs once on mount
+  }, [storageKey]);
 
   useEffect(() => {
     // This effect also runs only on the client and whenever 'theme' state changes.

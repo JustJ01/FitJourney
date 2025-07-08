@@ -1,19 +1,17 @@
 
-"use client"; // Added to ensure this component and its children are client-side
+"use client"; 
 
 import Logo from './Logo';
 import MainNav from './MainNav';
 import UserNav from './UserNav';
-import ThemeToggleButton from './ThemeToggleButton'; // Import ThemeToggleButton
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import ThemeToggleButton from './ThemeToggleButton'; 
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Menu } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth'; 
 
 const Header = () => {
-  // MobileNavClientWrapper is already a client component due to its own "use client"
-  // and useAuth call within it. This parent component being client ensures correct context.
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -36,9 +34,6 @@ const Header = () => {
 
 // Wrapper to ensure MobileNav part is client component
 const MobileNavClientWrapper = () => {
-  // This component already correctly has "use client" via its own definition if it were in a separate file,
-  // or implicitly because it uses a hook (useAuth).
-  // Explicit "use client" in parent Header ensures no ambiguity.
   const { user } = useAuth();
     
   const routes = [
@@ -59,6 +54,10 @@ const MobileNavClientWrapper = () => {
         </Button>
       </SheetTrigger>
       <SheetContent side="left">
+         <SheetHeader className="sr-only">
+          <SheetTitle>Navigation Menu</SheetTitle>
+          <SheetDescription>Main navigation links for the site.</SheetDescription>
+        </SheetHeader>
         <nav className="grid gap-6 text-lg font-medium mt-8 px-4">
           <SheetTrigger asChild><Logo /></SheetTrigger>
           {routes.map(route => (

@@ -34,7 +34,6 @@ export default function PlanExplorerPage() {
         setPlans(fetchedPlans);
       } catch (error) {
         console.error("Failed to fetch plans:", error);
-        // Handle error (e.g., show toast)
       } finally {
         setLoading(false);
       }
@@ -45,7 +44,7 @@ export default function PlanExplorerPage() {
   useEffect(() => {
     let currentPlans = [...plans];
 
-    // Apply search term filter
+
     if (filters.searchTerm) {
       const searchTermLower = filters.searchTerm.toLowerCase();
       currentPlans = currentPlans.filter(plan =>
@@ -55,27 +54,26 @@ export default function PlanExplorerPage() {
       );
     }
 
-    // Apply age range filter
+
     currentPlans = currentPlans.filter(plan =>
       plan.ageMin <= filters.ageRange[1] && plan.ageMax >= filters.ageRange[0]
     );
 
-    // Apply BMI category filter
     if (filters.bmiCategory && filters.bmiCategory !== 'All') {
       currentPlans = currentPlans.filter(plan => plan.bmiCategories.includes(filters.bmiCategory));
     }
 
-    // Apply rating filter
+
     if (filters.rating !== null) {
       currentPlans = currentPlans.filter(plan => plan.rating >= filters.rating!);
     }
     
-    // Apply price filter
+
     currentPlans = currentPlans.filter(plan =>
         plan.price >= filters.price[0] && plan.price <= filters.price[1]
     );
 
-    // Apply duration filter
+
     if (filters.duration && filters.duration !== "Any") {
       currentPlans = currentPlans.filter(plan => plan.duration === filters.duration);
     }

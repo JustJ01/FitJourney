@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Star, Tag, Users, CalendarDays, BarChart3 } from 'lucide-react';
 import Image from 'next/image';
-import FavoriteToggleButton from './FavoriteToggleButton'; // Import the new component
+import FavoriteToggleButton from './FavoriteToggleButton'; 
 
 interface PlanCardProps {
   plan: Plan;
@@ -40,7 +40,7 @@ const renderStars = (rating: number, planId: string, starSizeClass = "h-4 w-4") 
 
 const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
   const imageSrc = plan.imageUrl || `https://placehold.co/400x200.png?text=${encodeURIComponent(plan.name.substring(0,15))}`;
-  const imageHint = plan.imageUrl ? plan.name : "fitness abstract"; // Use plan name as hint if specific image, otherwise generic
+  const imageHint = plan.imageUrl ? plan.name : "fitness abstract"; 
 
   return (
     <Link href={`/plans/${plan.id}`} className="block group">
@@ -52,7 +52,7 @@ const PlanCard: React.FC<PlanCardProps> = ({ plan }) => {
             fill
             className="object-cover"
             data-ai-hint={imageHint}
-            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" // Basic example, adjust as needed
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" 
           />
            <div className="absolute top-3 right-3 flex items-center gap-2">
             <FavoriteToggleButton 

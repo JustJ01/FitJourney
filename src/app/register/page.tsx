@@ -12,7 +12,7 @@ import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
-import { UserPlus, Eye, EyeOff } from 'lucide-react'; // Import Eye and EyeOff icons
+import { UserPlus, Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const [name, setName] = useState('');
@@ -20,8 +20,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<'member' | 'trainer'>('member');
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false); // State for confirm password visibility
+  const [showPassword, setShowPassword] = useState(false); 
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false); 
   const { register, loading } = useAuth();
   const router = useRouter();
 
@@ -101,7 +101,7 @@ export default function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="text-base pr-10" // Add padding for the icon
+                  className="text-base pr-10" 
                 />
                 <button
                   type="button"
@@ -127,7 +127,7 @@ export default function RegisterPage() {
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   required
-                  className="text-base pr-10" // Add padding for the icon
+                  className="text-base pr-10" 
                 />
                  <button
                   type="button"

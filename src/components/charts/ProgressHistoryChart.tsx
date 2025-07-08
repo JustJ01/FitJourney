@@ -47,7 +47,7 @@ export const ProgressHistoryChart: React.FC<ProgressHistoryChartProps> = ({ data
 
   const chartData = data.map(entry => ({
     ...entry,
-    date: new Date(entry.date).getTime(), // Use timestamp for correct sorting/display
+    date: new Date(entry.date).getTime(), 
     value: entry[metric] || 0
   }));
 

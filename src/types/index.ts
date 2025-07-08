@@ -1,4 +1,5 @@
 
+
 import type { GeneratePersonalizedPlanOutput } from '@/ai/flows/generate-personalized-plan';
 import type { ACTUAL_PLAN_BMI_CATEGORIES } from '@/lib/constants';
 
@@ -7,11 +8,12 @@ export interface User {
   name: string;
   email: string;
   role: 'member' | 'trainer';
-  avatarUrl?: string; // Will now store Cloudinary URL
+  avatarUrl?: string; 
   age?: number;
   weight?: number; // in kg
   height?: number; // in cm
   gender?: 'male' | 'female' | 'other';
+  lastSeen?: string; // ISO string
 }
 
 export interface Trainer extends User {
@@ -22,11 +24,12 @@ export interface Trainer extends User {
 
 export interface UserProfileUpdateData {
   name?: string;
-  avatarUrl?: string; // This will be the Cloudinary URL string or "" for removal
+  avatarUrl?: string; 
   age?: number;
   weight?: number;
   height?: number;
   gender?: 'male' | 'female' | 'other';
+  lastSeen?: any; // For serverTimestamp
 }
 
 export interface TrainerProfileUpdateData extends UserProfileUpdateData {
@@ -60,7 +63,7 @@ export interface Plan {
   targetAudience: string;
   trainerId: string;
   trainerName?: string;
-  trainerAvatarUrl?: string; // Will now store Cloudinary URL
+  trainerAvatarUrl?: string;
   ageMin: number;
   ageMax: number;
   bmiCategories: PlanSpecificBMICategory[];
@@ -68,7 +71,7 @@ export interface Plan {
   updatedAt: string;
   exercises?: Exercise[];
   isPublished?: boolean;
-  imageUrl?: string; // Will now store Cloudinary URL
+  imageUrl?: string; 
 }
 
 export interface AIPlanRequest {
@@ -133,4 +136,44 @@ export interface UserPlanStatus {
   completedDays: number[];
   startDate: string; // ISO String
   lastUpdated: string; // ISO string
+}
+
+export interface ChatRoom {
+  id: string;
+  participantIds: string[];
+  participants: {
+    [key: string]: { // key is userId
+      name: string;
+      avatarUrl?: string;
+      role: 'member' | 'trainer';
+    }
+  };
+  lastMessage?: string;
+  lastMessageTimestamp?: string; // ISO string
+  lastMessageSenderId?: string;
+  updatedAt: string; // ISO string
+  readBy?: string[];
+  deletedBy?: { [userId: string]: string }; // Map of userId to deletion timestamp (ISO string)
+}
+
+export interface ChatMessage {
+  id: string;
+  chatRoomId: string;
+  senderId: string;
+  text: string;
+  timestamp: string; // ISO string
+  readBy: string[];
+  isDeleted?: boolean;
+}
+
+export interface ParticipantStatus {
+    lastSeen?: string; // ISO string
+}
+
+export interface PurchasedPlan {
+  id: string; // planId
+  userId: string;
+  planId: string;
+  purchasedAt: string; // ISO string
+  razorpayPaymentId: string;
 }

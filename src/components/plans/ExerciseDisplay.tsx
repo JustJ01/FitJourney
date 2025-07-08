@@ -28,7 +28,6 @@ const ExerciseDisplay: React.FC<ExerciseDisplayProps> = ({ exercises }) => {
     return <p className="text-muted-foreground">No exercises listed for this plan yet.</p>;
   }
 
-  // Group exercises by day
   const exercisesByDay: Record<string, Exercise[]> = exercises.reduce((acc, ex) => {
     const day = ex.dayOfWeek || 'Unassigned';
     if (!acc[day]) {

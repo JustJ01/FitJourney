@@ -37,7 +37,7 @@ const parseDurationToDays = (duration: string): number => {
       return value * 7;
     case 'month':
     case 'months':
-      return value * 30; // Approximation
+      return value * 30; 
     case 'day':
     case 'days':
       return value;

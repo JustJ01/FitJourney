@@ -1,15 +1,14 @@
 
 import type { Metadata } from 'next';
-import { GeistSans } from 'geist/font/sans'; // Corrected import for GeistSans
-import { GeistMono } from 'geist/font/mono'; // Corrected import for GeistMono
+import { GeistSans } from 'geist/font/sans'; 
+import { GeistMono } from 'geist/font/mono'; 
 import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ThemeProvider } from '@/contexts/ThemeContext'; // Import ThemeProvider
+import { ThemeProvider } from '@/contexts/ThemeContext'; 
 import { Toaster } from '@/components/ui/toaster';
-import AppLayout from '@/components/shared/AppLayout'; // Import the new AppLayout
+import AppLayout from '@/components/shared/AppLayout'; 
 import { APP_NAME } from '@/lib/constants';
 
-// Using GeistSans.variable and GeistMono.variable as per Next/Font documentation for CSS variables
 const geistSans = GeistSans;
 const geistMono = GeistMono;
 

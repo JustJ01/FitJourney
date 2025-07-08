@@ -15,7 +15,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 
-// Helper to parse duration string to total days
 const parseDurationToDays = (duration: string): number => {
     if (!duration) return 0;
     const parts = duration.toLowerCase().split(' ');
@@ -32,7 +31,7 @@ const parseDurationToDays = (duration: string): number => {
         return value * 7;
       case 'month':
       case 'months':
-        return value * 30; // Approximation
+        return value * 30;
       case 'day':
       case 'days':
         return value;
@@ -165,7 +164,7 @@ export default function MyProgressPage() {
             )}
 
             {selectedPlanId === 'all' ? (
-                // Show summary cards
+           
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {planSummaries.length > 0 ? (
                         planSummaries.map(summary => (

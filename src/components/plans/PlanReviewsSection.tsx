@@ -16,7 +16,7 @@ import { toast } from '@/hooks/use-toast';
 interface PlanReviewsSectionProps {
   planId: string;
   initialReviews: Review[];
-  onFeedbackSubmitted: () => void; // New prop
+  onFeedbackSubmitted: () => void; 
 }
 
 export default function PlanReviewsSection({ planId, initialReviews, onFeedbackSubmitted }: PlanReviewsSectionProps) {

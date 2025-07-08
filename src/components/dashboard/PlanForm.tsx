@@ -66,7 +66,7 @@ const PlanForm: React.FC<PlanFormProps> = ({ initialData, onSubmit: onSubmitFrom
   const [planImageFile, setPlanImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(initialData?.imageUrl || null);
   const [markImageForRemoval, setMarkImageForRemoval] = useState(false);
-  const [localIsSubmitting, setLocalIsSubmitting] = useState(false); // Local submitting state for image upload
+  const [localIsSubmitting, setLocalIsSubmitting] = useState(false);
 
   const form = useForm<PlanFormData>({
     resolver: zodResolver(planFormSchema),

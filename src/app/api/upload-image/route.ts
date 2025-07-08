@@ -1,9 +1,9 @@
 
 import { NextResponse } from 'next/server';
-import { cloudinary } from '@/lib/cloudinary'; // Cloudinary config
+import { cloudinary } from '@/lib/cloudinary'; 
 import { Readable } from 'stream';
 
-// Helper function to convert ReadableStream to Buffer
+
 async function streamToBuffer(readableStream: ReadableStream<Uint8Array>): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   const reader = readableStream.getReader();
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'No file provided.' }, { status: 400 });
     }
 
-    // Convert file to buffer
+    
     if (!file.stream) {
         return NextResponse.json({ error: 'File stream is not available.' }, { status: 400 });
     }
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     // Upload to Cloudinary
     const result = await new Promise((resolve, reject) => {
       const uploadStream = cloudinary.uploader.upload_stream(
-        { resource_type: 'auto', folder: 'fitjourney_uploads' }, // Optional: organize in Cloudinary folder
+        { resource_type: 'auto', folder: 'fitjourney_uploads' }, 
         (error, result) => {
           if (error) {
             console.error('Cloudinary Stream Upload Error:', error);
@@ -63,7 +63,6 @@ export async function POST(request: Request) {
 
   } catch (error: any) {
     console.error('API Upload Error:', error);
-    // Check if the error object has a message property
     const errorMessage = error.message || 'Internal server error during image upload.';
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }

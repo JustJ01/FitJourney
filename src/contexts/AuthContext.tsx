@@ -2,7 +2,7 @@
 "use client";
 
 import type { User, Trainer, UserProfileUpdateData, TrainerProfileUpdateData } from '@/types';
-import React, { createContext, useState, useEffect, type ReactNode } from 'react';
+import React, { createContext, useState, useEffect, type ReactNode, useRef } from 'react';
 import { auth, db } from '@/lib/firebase';
 import { 
   onAuthStateChanged, 
@@ -12,7 +12,7 @@ import {
   signOut as firebaseSignOut, 
   type User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { getUserById, getTrainerById, updateUserInFirestore, updateTrainerInFirestore } from '@/lib/data';
 
 interface AuthContextType {
@@ -34,6 +34,7 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | Trainer | null>(null);
   const [loading, setLoading] = useState(true);
+  const canUpdatePresence = useRef(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
@@ -110,6 +111,47 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     return () => unsubscribe();
   }, []);
+  
+  useEffect(() => {
+    if (!user) return;
+  
+    const updateUserPresence = async () => {
+      if (!canUpdatePresence.current) return;
+      canUpdatePresence.current = false;
+      setTimeout(() => { canUpdatePresence.current = true; }, 60000); 
+  
+      const collectionName = user.role === 'trainer' ? 'trainers' : 'users';
+      const userRef = doc(db, collectionName, user.id);
+      try {
+        await updateDoc(userRef, { lastSeen: serverTimestamp() });
+      } catch (e) {
+        console.error("Could not update user presence", e);
+      }
+    };
+  
+    const activityEvents: (keyof WindowEventMap)[] = ['mousemove', 'keydown', 'scroll', 'click'];
+    
+    activityEvents.forEach(event => {
+        window.addEventListener(event, updateUserPresence);
+    });
+    
+
+    updateUserPresence();
+  
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        updateUserPresence();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+  
+    return () => {
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, updateUserPresence);
+      });
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [user]);
 
   const login = async (email: string, password: string, roleAttempt: 'member' | 'trainer') => {
     setLoading(true);
@@ -168,11 +210,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
-      const userProfileData: Partial<User | Trainer> = {
+      const userProfileData: Partial<User | Trainer> & { lastSeen: any } = {
         name,
         email: firebaseUser.email, 
         role,
-        avatarUrl: "", 
+        avatarUrl: "",
+        lastSeen: serverTimestamp(),
       };
 
       if (role === 'trainer') {

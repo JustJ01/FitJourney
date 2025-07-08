@@ -12,13 +12,13 @@ import { APP_NAME } from '@/lib/constants';
 import { toast } from '@/hooks/use-toast';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import Link from 'next/link';
-import { Eye, EyeOff } from 'lucide-react'; // Import Eye and EyeOff icons
+import { Eye, EyeOff } from 'lucide-react'; 
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'member' | 'trainer'>('member');
-  const [showPassword, setShowPassword] = useState(false); // State for password visibility
+  const [showPassword, setShowPassword] = useState(false); 
   const { login, loading } = useAuth();
   const router = useRouter();
 
@@ -80,7 +80,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="text-base pr-10" // Add padding for the icon
+                  className="text-base pr-10" 
                 />
                 <button
                   type="button"

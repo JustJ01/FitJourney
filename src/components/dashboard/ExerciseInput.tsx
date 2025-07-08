@@ -11,14 +11,11 @@ import { DAYS_OF_WEEK } from '@/lib/constants';
 import { Textarea } from '../ui/textarea';
 import React from 'react';
 
-// Define a more specific type for the form data within this component's scope if needed,
-// or rely on PlanFormData from PlanForm. For now, we use generic FieldValues.
 interface ExerciseInputProps<TFieldValues extends FieldValues = FieldValues> {
   control: Control<TFieldValues>;
   index: number;
   onRemoveExercise: (index: number) => void;
-  // The 'exercise' prop (actual data) is no longer directly needed here for RHF controlled fields.
-  // RHF handles data through 'control' and 'name'.
+  
 }
 
 const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ control, index, onRemoveExercise }) => {
@@ -27,7 +24,6 @@ const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ control, index
     onRemoveExercise(index);
   };
 
-  // Construct field names dynamically
   const nameFieldName = `exercises.${index}.name` as FieldPath<FieldValues>;
   const dayOfWeekFieldName = `exercises.${index}.dayOfWeek` as FieldPath<FieldValues>;
   const setsFieldName = `exercises.${index}.sets` as FieldPath<FieldValues>;
@@ -91,7 +87,7 @@ const ExerciseInput: React.FC<ExerciseInputProps> = React.memo(({ control, index
                   type="number"
                   placeholder="e.g., 3"
                   {...field}
-                  onChange={e => field.onChange(parseInt(e.target.value) || 0)} // Ensure value is number
+                  onChange={e => field.onChange(parseInt(e.target.value) || 0)} 
                   className="text-sm h-9"
                 />
               </FormControl>

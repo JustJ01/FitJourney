@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Skeleton } from '@/components/ui/skeleton'; // For loading state
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -34,7 +34,6 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
   }, [user, loading, router, allowedRoles]);
 
   if (loading) {
-    // Show a loading skeleton or spinner while checking auth state
     return (
       <div className="space-y-4 p-4">
         <Skeleton className="h-12 w-full" />
@@ -45,14 +44,12 @@ const AuthGuard: React.FC<AuthGuardProps> = ({ children, allowedRoles }) => {
   }
 
   if (!user || (allowedRoles && !allowedRoles.includes(user.role))) {
-    // Still return null or a minimal component while redirecting
     return null; 
   }
 
   return <>{children}</>;
 };
 
-// Helper for toast notifications as AuthGuard itself is a component not a hook consumer
 import { toast } from '@/hooks/use-toast';
 
 export default AuthGuard;

@@ -63,7 +63,6 @@ export default function SavedPlansPage() {
   }
   
   if (!user || user.role !== 'member') {
-    // AuthGuard in layout should handle this, but good to have a fallback.
     return (
       <Alert variant="destructive">
         <HeartCrack className="h-5 w-5" />
@@ -89,7 +88,6 @@ export default function SavedPlansPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {savedPlans.map((plan) => (
             <PlanCard key={plan.id} plan={plan} />
-            // We might want a different version of PlanCard or add props to handle "unfavorite" later
           ))}
         </div>
       ) : (

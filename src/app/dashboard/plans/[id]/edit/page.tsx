@@ -71,9 +71,8 @@ export default function EditPlanPage() {
         instructions: ex.instructions || "",
       }));
 
-      // Prepare data for API: data already contains most fields from the form
+      
       const planDataForApi = { ...data }; 
-      // trainerId should not be changed here, it's part of initialPlanData and set by system
       delete (planDataForApi as any).trainerId;
 
  

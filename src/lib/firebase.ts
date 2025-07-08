@@ -19,7 +19,7 @@ const firebaseConfig = {
 let app: FirebaseApp;
 let db: Firestore;
 let storage: FirebaseStorage;
-let analytics: Analytics; // Declare analytics
+let analytics: Analytics; 
 
 if (getApps().length === 0) {
   app = initializeApp(firebaseConfig);

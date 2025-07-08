@@ -74,7 +74,7 @@ export default function TrainerDashboardPage() {
     }
   };
 
-  if (loading && !allTrainerPlans.length) { // Show skeleton only on initial load
+  if (loading && !allTrainerPlans.length) { 
     return (
       <div className="space-y-6">
         <div className="flex justify-between items-center">
@@ -154,7 +154,7 @@ export default function TrainerDashboardPage() {
           </div>
         </section>
       ) : (
-        !loading && ( // Only show this if not loading and no plans
+        !loading && (
           <Alert className="bg-card border-primary/30">
             <AlertTriangle className="h-5 w-5 text-primary" />
             <AlertTitle className="font-semibold">

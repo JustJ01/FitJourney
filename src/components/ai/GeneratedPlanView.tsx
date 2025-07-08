@@ -13,7 +13,7 @@ import { useState, useEffect } from 'react';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from 'next/navigation';
 
 interface GeneratedPlanViewProps {
   plan: AIGeneratedPlan | null;
@@ -22,7 +22,7 @@ interface GeneratedPlanViewProps {
 
 const GeneratedPlanView: React.FC<GeneratedPlanViewProps> = ({ plan, onRegenerate }) => {
   const { user } = useAuth();
-  const router = useRouter(); // Initialize useRouter
+  const router = useRouter(); 
   const [isSaving, setIsSaving] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [planName, setPlanName] = useState("");
