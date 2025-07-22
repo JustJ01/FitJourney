@@ -21,6 +21,7 @@ import PlanProgressTracker from '@/components/plans/PlanProgressTracker';
 import PlanHistoryLog from '@/components/plans/PlanHistoryLog';
 import { toast } from '@/hooks/use-toast';
 import { APP_NAME } from '@/lib/constants';
+import { useRouter } from 'next/navigation';
 
 
 interface PlanDetailsPageProps {
@@ -32,6 +33,7 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
   const { id } = params;
 
   const { user } = useAuth();
+  const router = useRouter();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [trainer, setTrainer] = useState<Trainer | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -135,8 +137,13 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
   }, [id, user, fetchAllUserData, refreshDataKey]);
 
   const handlePurchase = async () => {
-    if (!user || !plan) {
-      toast({ title: "Error", description: "User or plan details are missing.", variant: "destructive" });
+    if (!user) {
+        toast({ title: "Login Required", description: "Please log in to purchase a plan." });
+        router.push(`/login?redirect=/plans/${id}`);
+        return;
+    }
+    if (!plan) {
+      toast({ title: "Error", description: "Plan details are missing.", variant: "destructive" });
       return;
     }
     if (user.role !== 'member') {
@@ -458,13 +465,15 @@ export default function PlanDetailsPage({ params: paramsProp }: PlanDetailsPageP
                         <CardDescription>Purchase this plan to view the detailed workout schedule and track your progress.</CardDescription>
                     </CardHeader>
                     <CardFooter>
-                        <Button onClick={handlePurchase} disabled={isProcessingPayment || !user || user.role !== 'member'} size="lg" className="w-full">
+                        <Button onClick={handlePurchase} disabled={isProcessingPayment} size="lg" className="w-full">
                             <ShoppingCart className="mr-2 h-5 w-5" />
                             {isProcessingPayment 
                                 ? 'Processing...' 
-                                : (user?.role === 'trainer' 
-                                    ? 'Trainers Cannot Purchase Plans' 
-                                    : (user ? `Purchase for ₹${plan.price.toFixed(2)}` : "Login to Purchase"))}
+                                : (user?.role === 'member'
+                                    ? `Purchase for ₹${plan.price.toFixed(2)}`
+                                    : (user?.role === 'trainer'
+                                        ? 'Trainers Cannot Purchase Plans'
+                                        : "Login to Purchase"))}
                         </Button>
                     </CardFooter>
                 </Card>

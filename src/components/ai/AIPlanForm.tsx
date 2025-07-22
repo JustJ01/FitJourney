@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Lightbulb, Sparkles } from "lucide-react";
+import { Lightbulb, Sparkles, LogIn } from "lucide-react";
 import { FITNESS_GOALS, EXPERIENCE_LEVELS, WORKOUT_FREQUENCIES } from "@/lib/constants";
 
 const formSchema = z.object({
@@ -27,9 +27,10 @@ const formSchema = z.object({
 interface AIPlanFormProps {
   onSubmit: (data: AIPlanRequest) => void;
   isLoading: boolean;
+  isLoggedIn: boolean;
 }
 
-const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
+const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading, isLoggedIn }) => {
   const form = useForm<AIPlanRequest>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -38,7 +39,7 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
       bmi: 22,
       experienceLevel: "beginner",
       availableEquipment: "",
-      workoutFrequency: WORKOUT_FREQUENCIES[0], 
+      workoutFrequency: WORKOUT_FREQUENCIES[0], // Default to "As per AI suggestion"
       muscleFocus: "",
     },
   });
@@ -55,134 +56,136 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <FormField
-              control={form.control}
-              name="age"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Your Age</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="e.g., 30" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="fitnessGoal"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Primary Fitness Goal</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+            <fieldset disabled={!isLoggedIn || isLoading} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="age"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your Age</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your main goal" />
-                      </SelectTrigger>
+                      <Input type="number" placeholder="e.g., 30" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {FITNESS_GOALS.map(goal => (
-                        <SelectItem key={goal} value={goal}>{goal}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="bmi"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Your BMI (Body Mass Index)</FormLabel>
-                  <FormControl>
-                    <Input type="number" step="0.1" placeholder="e.g., 22.5" {...field} />
-                  </FormControl>
-                  <FormDescription>If unsure, estimate or use an online BMI calculator.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="experienceLevel"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fitness Experience Level</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="fitnessGoal"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Primary Fitness Goal</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your main goal" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {FITNESS_GOALS.map(goal => (
+                          <SelectItem key={goal} value={goal}>{goal}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bmi"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Your BMI (Body Mass Index)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your experience level" />
-                      </SelectTrigger>
+                      <Input type="number" step="0.1" placeholder="e.g., 22.5" {...field} />
                     </FormControl>
-                    <SelectContent>
-                      {EXPERIENCE_LEVELS.map(level => (
-                        <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="availableEquipment"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Available Equipment (Optional)</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="e.g., Dumbbells, resistance bands, full gym access, bodyweight only" {...field} rows={2} />
-                  </FormControl>
-                  <FormDescription>Let the AI know what you have access to.</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="workoutFrequency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Preferred Workout Frequency (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <FormDescription>If unsure, estimate or use an online BMI calculator.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="experienceLevel"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Fitness Experience Level</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your experience level" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {EXPERIENCE_LEVELS.map(level => (
+                          <SelectItem key={level.value} value={level.value}>{level.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="availableEquipment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Available Equipment (Optional)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="How often do you want to work out?" />
-                      </SelectTrigger>
+                      <Textarea placeholder="e.g., Dumbbells, resistance bands, full gym access, bodyweight only" {...field} rows={2} />
                     </FormControl>
-                    <SelectContent>
-                      {WORKOUT_FREQUENCIES.map(freq => (
-                        <SelectItem key={freq} value={freq}>{freq}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="muscleFocus"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Specific Muscle Focus (Optional)</FormLabel>
-                  <FormControl>
-                    <Input placeholder="e.g., Upper body, legs, core, glutes" {...field} />
-                  </FormControl>
-                  <FormDescription>Any particular areas you want to target?</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription>Let the AI know what you have access to.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="workoutFrequency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Preferred Workout Frequency (Optional)</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="How often do you want to work out?" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {WORKOUT_FREQUENCIES.map(freq => (
+                          <SelectItem key={freq} value={freq}>{freq}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="muscleFocus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Specific Muscle Focus (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Upper body, legs, core, glutes" {...field} />
+                    </FormControl>
+                    <FormDescription>Any particular areas you want to target?</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </fieldset>
             <Button type="submit" className="w-full text-lg py-6" disabled={isLoading}>
-              {isLoading ? "Generating Plan..." : (
-                <>
-                  <Sparkles className="mr-2 h-5 w-5" />
-                  Generate My Plan
-                </>
-              )}
+              {isLoading 
+                ? "Generating Plan..." 
+                : !isLoggedIn 
+                  ? <><LogIn className="mr-2 h-5 w-5" /> Login to Generate</>
+                  : <><Sparkles className="mr-2 h-5 w-5" /> Generate My Plan</>
+              }
             </Button>
           </form>
         </Form>
@@ -192,4 +195,3 @@ const AIPlanForm: React.FC<AIPlanFormProps> = ({ onSubmit, isLoading }) => {
 };
 
 export default AIPlanForm;
-

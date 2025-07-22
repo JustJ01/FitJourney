@@ -6,7 +6,7 @@ import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { format, subDays, isAfter, startOfWeek, differenceInCalendarDays } from 'date-fns';
+import { format, subDays, isAfter, startOfWeek, differenceInCalendarDays, isSameDay } from 'date-fns';
 import { Dumbbell, TrendingUp, Calendar, Flame, Trophy, Clock, BarChartHorizontalBig, Zap, ArrowLeft, Trash2 } from 'lucide-react';
 import {
   ResponsiveContainer,
@@ -126,7 +126,7 @@ export const ProgressOverview: React.FC<ProgressOverviewProps> = ({ entries }) =
     let calculatedWeeklyTotalVolume = 0;
     let calculatedWeeklyTotalDuration = 0;
     let calculatedWeeklyTotalCalories = 0;
-    const sevenDaysAgo = subDays(new Date(), 7);
+    const startOfThisWeek = startOfWeek(new Date(), { weekStartsOn: 0 }); // Sunday as the start of the week
     const exerciseStats: { [key: string]: { count: number, maxWeight: number } } = {};
     const workoutDates: Date[] = [];
 
@@ -145,7 +145,7 @@ export const ProgressOverview: React.FC<ProgressOverviewProps> = ({ entries }) =
       dataByDate[dateString].duration += duration;
       dataByDate[dateString].calories += calories;
 
-      if (isAfter(date, sevenDaysAgo)) {
+      if (isAfter(date, startOfThisWeek) || isSameDay(date, startOfThisWeek)) {
         calculatedWeeklyTotalVolume += volume;
         calculatedWeeklyTotalDuration += duration;
         calculatedWeeklyTotalCalories += calories;

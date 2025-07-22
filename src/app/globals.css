@@ -9,10 +9,10 @@ body {
 
 @layer base {
   :root {
-    --background: 0 0% 100%; /* Light mode background - White */
+    --background: 190 83% 93%; /* Light grayish-blue */
     --foreground: 222.2 84% 4.9%; /* Light mode foreground - Dark Blue/Black */
 
-    --card: 0 0% 100%;
+    --card: 0 0% 100%; /* White cards to contrast with the light blue background */
     --card-foreground: 222.2 84% 4.9%;
 
     --popover: 0 0% 100%;
